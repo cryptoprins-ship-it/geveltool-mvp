@@ -1,13 +1,14 @@
-# Changelog
 ## v0.9
+- GevelPlanner branding toegevoegd (titel + tagline: "Bereken je gevel in 2 minuten")
 - Visualisatie per zijde toegevoegd
-- Per zijde keuze toegevoegd: geen openingen, AI laten inschatten, handmatig invullen of overslaan
+- Per zijde keuze toegevoegd: geen ramen/deuren, AI laten inschatten, handmatig invullen of overslaan
 - Preview per zijde toegevoegd voor foto of gekozen bestand
-- AI-inschatting van kozijnen en openingen toegevoegd op basis van foto plus ingevulde breedte en hoogte van de zijde
+- AI-inschatting van ramen en deuren toegevoegd op basis van foto en opgegeven breedte en hoogte van de zijde
 - Handmatige correctie van AI-resultaten toegevoegd
 - Ondersteuning toegevoegd voor meerdere zijdes met afzonderlijke foto’s en instellingen
-- Backend API-routes toegevoegd voor openingenanalyse en visualisatieverwerking
-- Netto geveloppervlak per zijde en totaalberekening voorbereid op basis van openingen
+- Backend API-routes toegevoegd voor AI-analyse en visualisatieverwerking
+- Netto geveloppervlak per zijde en totaalberekening op basis van ramen en deuren
+- UX verbeterd: duidelijkere terminologie ("ramen/deuren" i.p.v. "openingen") en gebruiksvriendelijkere instructies
 
 ## v0.8
 - Uploadknop opgesplitst in Maak foto en Kies bestand

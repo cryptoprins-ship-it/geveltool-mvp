@@ -351,10 +351,11 @@ export default function VisualisatiePage() {
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
-      <section className="rounded-2xl border p-4 md:p-6">
-        <h1 className="text-2xl font-semibold">Visualisatie per zijde</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Voeg per zijde de afmetingen toe en bepaal daarna of er geen openingen zijn, of je AI wilt gebruiken, handmatig wilt invoeren of de zijde wilt overslaan.
+      <section className="rounded-2xl border bg-white p-4 md:p-6 text-center">
+        <h1 className="text-3xl font-bold tracking-tight text-black">GevelPlanner</h1>
+        <p className="mt-2 text-base font-medium text-gray-700">Bereken je gevel in 2 minuten</p>
+        <p className="mt-3 text-sm text-gray-600">
+          Voeg per zijde de afmetingen toe en bepaal daarna of deze zijde geen ramen/deuren heeft, door AI moet worden ingeschat, handmatig wordt ingevuld of moet worden overgeslagen.
         </p>
       </section>
 
@@ -465,11 +466,11 @@ export default function VisualisatiePage() {
           </div>
 
           <div className="space-y-3">
-            <p className="text-sm font-medium">Openingen op deze zijde</p>
+            <p className="text-sm font-medium">Ramen en deuren op deze zijde</p>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {[
-                { value: "none", label: "Geen openingen" },
-                { value: "ai", label: "AI laten inschatten" },
+                { value: "none", label: "Geen ramen/deuren" },
+                { value: "ai", label: "AI ramen/deuren laten inschatten" },
                 { value: "manual", label: "Handmatig invullen" },
                 { value: "skip", label: "Overslaan" },
               ].map((option) => {
@@ -494,7 +495,7 @@ export default function VisualisatiePage() {
 
           {side.openingMode === "none" ? (
             <div className="rounded-2xl border bg-gray-50 p-4 text-sm text-gray-700">
-              Deze zijde heeft geen kozijnen of andere openingen.
+              Deze zijde heeft geen ramen, deuren of andere openingen.
             </div>
           ) : null}
 
@@ -502,9 +503,9 @@ export default function VisualisatiePage() {
             <div className="space-y-4 rounded-2xl border p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h3 className="font-semibold">AI-inschatting openingen</h3>
+                  <h3 className="font-semibold">AI-inschatting ramen en deuren</h3>
                   <p className="text-sm text-gray-600">
-                    AI gebruikt de foto en de ingevulde breedte en hoogte van deze zijde als schaal voor een eerste schatting.
+                    AI gebruikt de foto en de ingevulde breedte en hoogte van deze zijde als schaal voor een eerste schatting van ramen en deuren.
                   </p>
                 </div>
 
@@ -520,7 +521,7 @@ export default function VisualisatiePage() {
 
               {side.aiDetectedCount !== null ? (
                 <div className="rounded-xl border bg-gray-50 p-3 text-sm">
-                  AI heeft {side.aiDetectedCount} opening{side.aiDetectedCount === 1 ? "" : "en"} gevonden.
+                  AI heeft {side.aiDetectedCount} raam/deur-openingen gevonden.
                 </div>
               ) : null}
 
@@ -607,13 +608,13 @@ export default function VisualisatiePage() {
               <div>
                 <h3 className="font-semibold">Handmatige invoer openingen</h3>
                 <p className="text-sm text-gray-600">
-                  Voeg alleen de kozijnen of openingen toe die op deze zijde aanwezig zijn.
+                  Voeg alleen de ramen, deuren of andere openingen toe die op deze zijde aanwezig zijn.
                 </p>
               </div>
 
               {side.openings.length === 0 ? (
                 <div className="rounded-2xl border border-dashed p-4 text-sm text-gray-500">
-                  Nog geen openingen toegevoegd.
+                  Nog geen ramen of deuren toegevoegd.
                 </div>
               ) : null}
 
@@ -682,7 +683,7 @@ export default function VisualisatiePage() {
                 className="rounded-xl border px-4 py-2"
                 onClick={() => addOpening(side.id)}
               >
-                Kozijn / opening toevoegen
+                Raam / deur toevoegen
               </button>
             </div>
           ) : null}
@@ -722,7 +723,7 @@ export default function VisualisatiePage() {
       ) : null}
 
       <section className="rounded-2xl border p-4 text-sm text-gray-600">
-        AI geeft een eerste inschatting op basis van foto plus opgegeven zijdebreedte en zijdehoogte. De gebruiker moet deze waarden altijd kunnen controleren en aanpassen.
+        AI geeft een eerste inschatting op basis van foto plus opgegeven zijdebreedte en zijdehoogte. Controleer en corrigeer de voorgestelde ramen en deuren altijd voordat je verdergaat.
       </section>
     </main>
   );
