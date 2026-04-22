@@ -28,14 +28,7 @@ type Side = {
   error: string;
   frameCount: string;
   frameSizeType: FrameSizeType;
-  linkToSideId?: string | undefined;
-};
-
-type AiDetection = {
-  type: OpeningType;
-  widthEstimateCm: number;
-  heightEstimateCm: number;
-  count: number;
+  linkToSideId?: string;
 };
 
 type SavedSide = Omit<Side, "photo" | "previewUrl"> & {
@@ -51,8 +44,15 @@ type SavedState = {
   sides: SavedSide[];
 };
 
+type AiDetection = {
+  type: OpeningType;
+  widthEstimateCm: number;
+  heightEstimateCm: number;
+  count: number;
+};
+
 const MAX_SIDES = 10;
-const STORAGE_KEY = "gevelplanner-data-v1";
+const STORAGE_KEY = "gevelplanner-data-v1-4";
 
 const frameSizeAverages: Record<FrameSizeType, number> = {
   small: 1.0,
@@ -114,14 +114,6 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function copyDimensions(source: Side, target: Side): Side {
-  return {
-    ...target,
-    width: source.width,
-    height: source.height,
-  };
-}
-
 function sanitizeSidesForSave(sides: Side[]): SavedSide[] {
   return sides.map((side) => ({
     ...side,
@@ -138,6 +130,42 @@ function isValidSavedState(value: unknown): value is SavedState {
     typeof data.sideCount === "number" &&
     Array.isArray(data.sides)
   );
+}
+
+function getAutoLinkedSourceId(
+  index: number,
+  sides: Side[],
+  frontBackEqual: boolean | null,
+  leftRightEqual: boolean | null
+): string | undefined {
+  if (index === 1 && frontBackEqual && sides[0]) return sides[0].id;
+  if (index === 3 && leftRightEqual && sides[2]) return sides[2].id;
+  return undefined;
+}
+
+function getSourceSide(
+  side: Side,
+  index: number,
+  sides: Side[],
+  frontBackEqual: boolean | null,
+  leftRightEqual: boolean | null
+): { source?: Side; isAuto: boolean } {
+  const autoId = getAutoLinkedSourceId(index, sides, frontBackEqual, leftRightEqual);
+  if (autoId) {
+    return {
+      source: sides.find((s) => s.id === autoId),
+      isAuto: true,
+    };
+  }
+
+  if (side.linkToSideId) {
+    return {
+      source: sides.find((s) => s.id === side.linkToSideId),
+      isAuto: false,
+    };
+  }
+
+  return { source: undefined, isAuto: false };
 }
 
 export default function Page() {
@@ -202,7 +230,7 @@ export default function Page() {
         try {
           URL.revokeObjectURL(url);
         } catch {
-          // ignore cleanup errors
+          // ignore cleanup
         }
       });
     };
@@ -225,63 +253,6 @@ export default function Page() {
       console.error("Fout bij opslaan in localStorage", error);
     }
   }, [hasLoadedSavedState, inputMode, sideCount, frontBackEqual, leftRightEqual, sides]);
-
-  useEffect(() => {
-    setSides((prev) => {
-      const next: Side[] = prev.map((side) => ({
-        ...side,
-        linkToSideId: undefined as string | undefined,
-      }));
-
-      if (sideCount >= 2 && frontBackEqual && next[0] && next[1]) {
-        next[1] = {
-          ...copyDimensions(next[0], next[1]),
-          linkToSideId: next[0].id,
-        };
-      }
-
-      if (sideCount >= 4 && leftRightEqual && next[2] && next[3]) {
-        next[3] = {
-          ...copyDimensions(next[2], next[3]),
-          linkToSideId: next[2].id,
-        };
-      }
-
-      return next;
-    });
-  }, [frontBackEqual, leftRightEqual, sideCount]);
-
-  const canContinue = useMemo(() => {
-    if (sides.length === 0) return false;
-
-    return sides.every((side) => {
-      const hasBaseDimensions =
-        side.width.trim() !== "" && side.height.trim() !== "";
-      if (!hasBaseDimensions) return false;
-
-      if (side.openingMode === "skip" || side.openingMode === "none") return true;
-      if (side.openingMode === "estimate") return toNumber(side.frameCount) > 0;
-      if (!side.photo) return false;
-
-      if (side.openingMode === "ai") {
-        return side.openings.length > 0 || !!side.frameCount;
-      }
-
-      if (side.openingMode === "manual") {
-        return (
-          side.openings.length > 0 &&
-          side.openings.every(
-            (opening) =>
-              opening.width.trim() !== "" &&
-              opening.height.trim() !== "" &&
-              opening.count.trim() !== ""
-          )
-        );
-      }
-
-      return true;
-    });
-  }, [sides]);
 
   const updateSide = (sideId: string, updater: (side: Side) => Side) => {
     setSides((prev) => prev.map((side) => (side.id === sideId ? updater(side) : side)));
@@ -411,7 +382,23 @@ export default function Page() {
     }));
   };
 
-  const estimateOpeningsWithAi = async (side: Side) => {
+  const getResolvedWidth = (
+    side: Side,
+    index: number
+  ): string => {
+    const { source } = getSourceSide(side, index, sides, frontBackEqual, leftRightEqual);
+    return source ? source.width : side.width;
+  };
+
+  const getResolvedHeight = (
+    side: Side,
+    index: number
+  ): string => {
+    const { source } = getSourceSide(side, index, sides, frontBackEqual, leftRightEqual);
+    return source ? source.height : side.height;
+  };
+
+  const estimateOpeningsWithAi = async (side: Side, index: number) => {
     if (!side.photo) {
       updateSide(side.id, (current) => ({
         ...current,
@@ -420,7 +407,10 @@ export default function Page() {
       return;
     }
 
-    if (!side.width.trim() || !side.height.trim()) {
+    const widthValue = getResolvedWidth(side, index);
+    const heightValue = getResolvedHeight(side, index);
+
+    if (!widthValue.trim() || !heightValue.trim()) {
       updateSide(side.id, (current) => ({
         ...current,
         error: "Vul eerst breedte en hoogte van deze zijde in.",
@@ -434,8 +424,8 @@ export default function Page() {
 
       const formData = new FormData();
       formData.append("image", side.photo);
-      formData.append("sideWidthCm", side.width);
-      formData.append("sideHeightCm", side.height);
+      formData.append("sideWidthCm", widthValue);
+      formData.append("sideHeightCm", heightValue);
       formData.append("sideName", side.name);
 
       const response = await fetch("/api/estimate-openings", {
@@ -517,28 +507,17 @@ export default function Page() {
     else setLeftRightEqual(true);
   };
 
-  const handleLinkChange = (sideId: string, sourceId: string) => {
-    setSides((prev) => {
-      return prev.map((side) => {
-        if (side.id !== sideId) return side;
-
-        if (!sourceId) {
-          return { ...side, linkToSideId: undefined };
-        }
-
-        const source = prev.find((s) => s.id === sourceId);
-        if (!source) {
-          return { ...side, linkToSideId: undefined };
-        }
-
-        return {
-          ...side,
-          linkToSideId: sourceId,
-          width: source.width,
-          height: source.height,
-        };
-      });
-    });
+  const handleManualLinkChange = (sideId: string, sourceId: string) => {
+    setSides((prev) =>
+      prev.map((side) =>
+        side.id === sideId
+          ? {
+              ...side,
+              linkToSideId: sourceId || undefined,
+            }
+          : side
+      )
+    );
   };
 
   const resetSavedData = () => {
@@ -565,8 +544,11 @@ export default function Page() {
     return round2(count * frameSizeAverages[side.frameSizeType]);
   };
 
-  const getGrossAreaM2 = (side: Side) => {
-    return round2((toNumber(side.width) / 100) * (toNumber(side.height) / 100));
+  const getGrossAreaM2 = (side: Side, index: number) => {
+    return round2(
+      (toNumber(getResolvedWidth(side, index)) / 100) *
+        (toNumber(getResolvedHeight(side, index)) / 100)
+    );
   };
 
   const getOpeningAreaM2 = (side: Side) => {
@@ -585,18 +567,65 @@ export default function Page() {
     return 0;
   };
 
-  const getNetAreaM2 = (side: Side) => {
-    return round2(Math.max(0, getGrossAreaM2(side) - getOpeningAreaM2(side)));
+  const getNetAreaM2 = (side: Side, index: number) => {
+    return round2(Math.max(0, getGrossAreaM2(side, index) - getOpeningAreaM2(side)));
   };
+
+  const canContinue = useMemo(() => {
+    if (sides.length === 0) return false;
+
+    return sides.every((side, index) => {
+      const widthValue = getResolvedWidth(side, index);
+      const heightValue = getResolvedHeight(side, index);
+      const hasBaseDimensions =
+        widthValue.trim() !== "" && heightValue.trim() !== "";
+
+      if (!hasBaseDimensions) return false;
+
+      if (side.openingMode === "skip" || side.openingMode === "none") return true;
+      if (side.openingMode === "estimate") return toNumber(side.frameCount) > 0;
+      if (!side.photo) return false;
+
+      if (side.openingMode === "ai") {
+        return side.openings.length > 0 || !!side.frameCount;
+      }
+
+      if (side.openingMode === "manual") {
+        return (
+          side.openings.length > 0 &&
+          side.openings.every(
+            (opening) =>
+              opening.width.trim() !== "" &&
+              opening.height.trim() !== "" &&
+              opening.count.trim() !== ""
+          )
+        );
+      }
+
+      return true;
+    });
+  }, [sides, frontBackEqual, leftRightEqual]);
 
   const totals = useMemo(() => {
     const includedSides = sides.filter((side) => side.openingMode !== "skip");
     return {
-      gross: round2(includedSides.reduce((sum, side) => sum + getGrossAreaM2(side), 0)),
-      opening: round2(includedSides.reduce((sum, side) => sum + getOpeningAreaM2(side), 0)),
-      net: round2(includedSides.reduce((sum, side) => sum + getNetAreaM2(side), 0)),
+      gross: round2(
+        includedSides.reduce((sum, side) => {
+          const index = sides.findIndex((s) => s.id === side.id);
+          return sum + getGrossAreaM2(side, index);
+        }, 0)
+      ),
+      opening: round2(
+        includedSides.reduce((sum, side) => sum + getOpeningAreaM2(side), 0)
+      ),
+      net: round2(
+        includedSides.reduce((sum, side) => {
+          const index = sides.findIndex((s) => s.id === side.id);
+          return sum + getNetAreaM2(side, index);
+        }, 0)
+      ),
     };
-  }, [sides]);
+  }, [sides, frontBackEqual, leftRightEqual]);
 
   const handleContinue = async () => {
     setGlobalError("");
@@ -611,11 +640,11 @@ export default function Page() {
       setIsSubmitting(true);
 
       const formData = new FormData();
-      const payload = sides.map((side) => ({
+      const payload = sides.map((side, index) => ({
         id: side.id,
         name: side.name,
-        width: side.width,
-        height: side.height,
+        width: getResolvedWidth(side, index),
+        height: getResolvedHeight(side, index),
         openingMode: side.openingMode,
         aiDetectedCount: side.aiDetectedCount,
         frameCount: side.frameCount,
@@ -761,13 +790,24 @@ export default function Page() {
           </p>
         </section>
 
-        {sides.map((side) => {
-          const linked = side.linkToSideId
-            ? sides.find((s) => s.id === side.linkToSideId)
-            : null;
+        {sides.map((side, index) => {
+          const { source, isAuto } = getSourceSide(
+            side,
+            index,
+            sides,
+            frontBackEqual,
+            leftRightEqual
+          );
 
+          const isLinked = !!source;
+          const resolvedWidth = getResolvedWidth(side, index);
+          const resolvedHeight = getResolvedHeight(side, index);
           const aiCanRun =
-            !!side.photo && side.width.trim() !== "" && side.height.trim() !== "";
+            !!side.photo && resolvedWidth.trim() !== "" && resolvedHeight.trim() !== "";
+
+          const manualLinkOptions = sides.filter(
+            (s, optionIndex) => s.id !== side.id && optionIndex < index
+          );
 
           return (
             <section
@@ -793,31 +833,35 @@ export default function Page() {
                 ) : null}
               </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-800">
-                  Neem afmetingen over van zijde
-                </label>
-                <select
-                  className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
-                  value={side.linkToSideId || ""}
-                  onChange={(e) => handleLinkChange(side.id, e.target.value)}
-                >
-                  <option value="">Handmatig invullen</option>
-                  {sides
-                    .filter((s) => s.id !== side.id)
-                    .map((s) => (
+              {isAuto ? (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                  Automatisch gekoppeld aan {source?.name}.
+                </div>
+              ) : (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-800">
+                    Neem afmetingen over van zijde
+                  </label>
+                  <select
+                    className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
+                    value={side.linkToSideId || ""}
+                    onChange={(e) => handleManualLinkChange(side.id, e.target.value)}
+                  >
+                    <option value="">Handmatig invullen</option>
+                    {manualLinkOptions.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
                       </option>
                     ))}
-                </select>
+                  </select>
 
-                {linked ? (
-                  <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-                    Afmetingen worden overgenomen van {linked.name}. Ramen en deuren blijven apart voor deze zijde.
-                  </div>
-                ) : null}
-              </div>
+                  {!isAuto && side.linkToSideId && source ? (
+                    <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                      Afmetingen worden overgenomen van {source.name}.
+                    </div>
+                  ) : null}
+                </div>
+              )}
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
@@ -826,13 +870,13 @@ export default function Page() {
                   </label>
                   <input
                     className={`w-full rounded-xl border border-gray-300 p-3 text-black outline-none transition focus:border-black ${
-                      linked ? "bg-gray-100" : "bg-white"
+                      isLinked ? "bg-gray-100" : "bg-white"
                     }`}
                     inputMode="numeric"
-                    value={side.width}
+                    value={resolvedWidth}
                     onChange={(e) => setSideField(side.id, "width", e.target.value)}
                     placeholder="Bijv. 540"
-                    disabled={!!linked}
+                    disabled={isLinked}
                   />
                 </div>
 
@@ -842,13 +886,13 @@ export default function Page() {
                   </label>
                   <input
                     className={`w-full rounded-xl border border-gray-300 p-3 text-black outline-none transition focus:border-black ${
-                      linked ? "bg-gray-100" : "bg-white"
+                      isLinked ? "bg-gray-100" : "bg-white"
                     }`}
                     inputMode="numeric"
-                    value={side.height}
+                    value={resolvedHeight}
                     onChange={(e) => setSideField(side.id, "height", e.target.value)}
                     placeholder="Bijv. 280"
-                    disabled={!!linked}
+                    disabled={isLinked}
                   />
                 </div>
               </div>
@@ -1023,7 +1067,7 @@ export default function Page() {
                     <button
                       type="button"
                       className="rounded-xl border border-gray-300 bg-white px-4 py-2 font-medium text-black transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={() => estimateOpeningsWithAi(side)}
+                      onClick={() => estimateOpeningsWithAi(side, index)}
                       disabled={aiLoadingSideId === side.id || !aiCanRun}
                     >
                       {aiLoadingSideId === side.id ? "AI analyseert..." : "Analyseer foto"}
@@ -1253,7 +1297,7 @@ export default function Page() {
                   <div className="rounded-xl bg-white p-3">
                     <div className="text-gray-500">Bruto oppervlak</div>
                     <div className="mt-1 font-semibold">
-                      {getGrossAreaM2(side).toFixed(2)} m²
+                      {getGrossAreaM2(side, index).toFixed(2)} m²
                     </div>
                   </div>
 
@@ -1267,7 +1311,7 @@ export default function Page() {
                   <div className="rounded-xl bg-white p-3">
                     <div className="text-gray-500">Netto oppervlak</div>
                     <div className="mt-1 font-semibold">
-                      {getNetAreaM2(side).toFixed(2)} m²
+                      {getNetAreaM2(side, index).toFixed(2)} m²
                     </div>
                   </div>
                 </div>
@@ -1315,8 +1359,7 @@ export default function Page() {
         ) : null}
 
         <section className="rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm">
-          Alleen de afmetingen kunnen automatisch worden gekoppeld als voor/achter of links/rechts gelijk zijn.
-          Ramen en deuren worden altijd per zijde apart verwerkt.
+          Alleen de afmetingen worden gekoppeld. Ramen en deuren worden altijd per zijde apart verwerkt.
           Ingevulde gegevens blijven lokaal bewaard totdat je ze reset.
         </section>
       </div>
