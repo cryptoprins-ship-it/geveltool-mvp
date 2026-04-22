@@ -1,14 +1,31 @@
-## v0.9
+## v1.0
 - GevelPlanner branding toegevoegd (titel + tagline: "Bereken je gevel in 2 minuten")
 - Visualisatie per zijde toegevoegd
-- Per zijde keuze toegevoegd: geen ramen/deuren, AI laten inschatten, handmatig invullen of overslaan
+- Per zijde keuze toegevoegd: geen ramen/deuren, AI laten inschatten, handmatig invullen, gemiddeld inschatten of overslaan
+- Nieuwe gemiddelde inschatting toegevoegd op basis van aantal kozijnen
+- Gemiddelde grootte kozijnen toegevoegd met vaste waarden:
+  - Klein – gemiddeld 1,0 m² per kozijn
+  - Gemiddeld – gemiddeld 1,6 m² per kozijn
+  - Groot – gemiddeld 2,5 m² per kozijn
+- Automatische aftrek per zijde toegevoegd op basis van aantal kozijnen en gekozen gemiddelde grootte
 - Preview per zijde toegevoegd voor foto of gekozen bestand
 - AI-inschatting van ramen en deuren toegevoegd op basis van foto en opgegeven breedte en hoogte van de zijde
 - Handmatige correctie van AI-resultaten toegevoegd
 - Ondersteuning toegevoegd voor meerdere zijdes met afzonderlijke foto’s en instellingen
 - Backend API-routes toegevoegd voor AI-analyse en visualisatieverwerking
 - Netto geveloppervlak per zijde en totaalberekening op basis van ramen en deuren
-- UX verbeterd: duidelijkere terminologie ("ramen/deuren" i.p.v. "openingen") en gebruiksvriendelijkere instructies
+- UX verbeterd: duidelijkere terminologie ("ramen/deuren" in plaats van "openingen") en gebruiksvriendelijkere instructies
+- Totaaloverzicht toegevoegd met bruto oppervlak, aftrek en netto oppervlak
+
+## v0.9
+- Visualisatie per zijde toegevoegd
+- Per zijde keuze toegevoegd: geen openingen, AI laten inschatten, handmatig invullen of overslaan
+- Preview per zijde toegevoegd voor foto of gekozen bestand
+- AI-inschatting van kozijnen en openingen toegevoegd op basis van foto plus ingevulde breedte en hoogte van de zijde
+- Handmatige correctie van AI-resultaten toegevoegd
+- Ondersteuning toegevoegd voor meerdere zijdes met afzonderlijke foto’s en instellingen
+- Backend API-routes toegevoegd voor openingenanalyse en visualisatieverwerking
+- Netto geveloppervlak per zijde en totaalberekening voorbereid op basis van openingen
 
 ## v0.8
 - Uploadknop opgesplitst in Maak foto en Kies bestand

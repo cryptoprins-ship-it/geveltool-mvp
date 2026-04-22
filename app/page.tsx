@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type OpeningMode = "none" | "ai" | "manual" | "skip";
+type OpeningMode = "none" | "ai" | "manual" | "estimate" | "skip";
 type OpeningType = "window" | "door" | "other";
+type FrameSizeType = "small" | "medium" | "large";
 
 type Opening = {
   id: string;
@@ -24,6 +25,8 @@ type Side = {
   aiDetectedCount: number | null;
   openings: Opening[];
   error: string;
+  frameCount: string;
+  frameSizeType: FrameSizeType;
 };
 
 type AiDetection = {
@@ -34,6 +37,12 @@ type AiDetection = {
 };
 
 const MAX_SIDES = 10;
+
+const frameSizeAverages: Record<FrameSizeType, number> = {
+  small: 1.0,
+  medium: 1.6,
+  large: 2.5,
+};
 
 function createOpening(): Opening {
   return {
@@ -57,7 +66,18 @@ function createSide(index: number): Side {
     aiDetectedCount: null,
     openings: [],
     error: "",
+    frameCount: "",
+    frameSizeType: "medium",
   };
+}
+
+function toNumber(value: string): number {
+  const parsed = Number(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 export default function VisualisatiePage() {
@@ -92,6 +112,10 @@ export default function VisualisatiePage() {
 
       if (side.openingMode === "skip" || side.openingMode === "none") return true;
 
+      if (side.openingMode === "estimate") {
+        return toNumber(side.frameCount) > 0;
+      }
+
       if (!side.photo) return false;
 
       if (side.openingMode === "ai") {
@@ -118,7 +142,7 @@ export default function VisualisatiePage() {
     setSides((prev) => prev.map((side) => (side.id === sideId ? updater(side) : side)));
   };
 
-  const setSideField = (sideId: string, field: keyof Side, value: any) => {
+  const setSideField = <K extends keyof Side>(sideId: string, field: K, value: Side[K]) => {
     updateSide(sideId, (side) => ({ ...side, [field]: value }));
   };
 
@@ -178,7 +202,16 @@ export default function VisualisatiePage() {
           ...side,
           openingMode: "manual",
           openings: side.openings.length > 0 ? side.openings : [createOpening()],
-          aiDetectedCount: side.aiDetectedCount,
+          error: "",
+        };
+      }
+
+      if (mode === "estimate") {
+        return {
+          ...side,
+          openingMode: "estimate",
+          openings: [],
+          aiDetectedCount: null,
           error: "",
         };
       }
@@ -205,11 +238,11 @@ export default function VisualisatiePage() {
     }));
   };
 
-  const updateOpening = (
+  const updateOpening = <K extends keyof Opening>(
     sideId: string,
     openingId: string,
-    field: keyof Opening,
-    value: string
+    field: K,
+    value: Opening[K]
   ) => {
     updateSide(sideId, (side) => ({
       ...side,
@@ -267,7 +300,8 @@ export default function VisualisatiePage() {
       });
 
       if (!response.ok) {
-        throw new Error("AI-inschatting mislukt.");
+        const errorText = await response.text();
+        throw new Error(errorText || "AI-inschatting mislukt.");
       }
 
       const data = await response.json();
@@ -280,7 +314,7 @@ export default function VisualisatiePage() {
         openingMode: "ai",
         error:
           detections.length === 0
-            ? "AI vond geen ramen/deuren. Je kunt handmatig invullen of deze zijde op geen ramen/deuren zetten."
+            ? "AI vond geen ramen/deuren. Je kunt handmatig invullen of de gemiddelde inschatting gebruiken."
             : "",
       }));
     } catch (error) {
@@ -288,7 +322,9 @@ export default function VisualisatiePage() {
       updateSide(side.id, (current) => ({
         ...current,
         error:
-          "AI kon de ramen/deuren niet inschatten. Vul ze handmatig in of sla deze zijde over.",
+          error instanceof Error
+            ? error.message
+            : "AI kon de ramen/deuren niet inschatten.",
       }));
     } finally {
       setAiLoadingSideId(null);
@@ -312,6 +348,49 @@ export default function VisualisatiePage() {
     });
   };
 
+  const getEstimatedDeductionM2 = (side: Side) => {
+    const count = toNumber(side.frameCount);
+    return round2(count * frameSizeAverages[side.frameSizeType]);
+  };
+
+  const getGrossAreaM2 = (side: Side) => {
+    return round2((toNumber(side.width) / 100) * (toNumber(side.height) / 100));
+  };
+
+  const getOpeningAreaM2 = (side: Side) => {
+    if (side.openingMode === "none" || side.openingMode === "skip") return 0;
+
+    if (side.openingMode === "estimate") {
+      return getEstimatedDeductionM2(side);
+    }
+
+    if (side.openingMode === "manual" || side.openingMode === "ai") {
+      return round2(
+        side.openings.reduce((sum, opening) => {
+          const widthCm = toNumber(opening.width);
+          const heightCm = toNumber(opening.height);
+          const count = toNumber(opening.count);
+          return sum + (widthCm / 100) * (heightCm / 100) * count;
+        }, 0)
+      );
+    }
+
+    return 0;
+  };
+
+  const getNetAreaM2 = (side: Side) => {
+    return round2(Math.max(0, getGrossAreaM2(side) - getOpeningAreaM2(side)));
+  };
+
+  const totals = useMemo(() => {
+    const includedSides = sides.filter((side) => side.openingMode !== "skip");
+    return {
+      gross: round2(includedSides.reduce((sum, side) => sum + getGrossAreaM2(side), 0)),
+      opening: round2(includedSides.reduce((sum, side) => sum + getOpeningAreaM2(side), 0)),
+      net: round2(includedSides.reduce((sum, side) => sum + getNetAreaM2(side), 0)),
+    };
+  }, [sides]);
+
   const handleContinue = async () => {
     setGlobalError("");
 
@@ -334,6 +413,8 @@ export default function VisualisatiePage() {
         height: side.height,
         openingMode: side.openingMode,
         aiDetectedCount: side.aiDetectedCount,
+        frameCount: side.frameCount,
+        frameSizeType: side.frameSizeType,
         openings: side.openings,
       }));
 
@@ -375,7 +456,8 @@ export default function VisualisatiePage() {
           <p className="mt-3 text-sm leading-6 text-gray-600">
             Voeg per zijde de afmetingen toe en bepaal daarna of deze zijde geen
             ramen/deuren heeft, door AI moet worden ingeschat, handmatig wordt
-            ingevuld of moet worden overgeslagen.
+            ingevuld, via een gemiddelde inschatting wordt berekend of moet worden
+            overgeslagen.
           </p>
         </section>
 
@@ -504,11 +586,12 @@ export default function VisualisatiePage() {
               <p className="text-sm font-medium text-gray-800">
                 Ramen en deuren op deze zijde
               </p>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 {[
                   { value: "none", label: "Geen ramen/deuren" },
-                  { value: "ai", label: "AI ramen/deuren laten inschatten" },
+                  { value: "ai", label: "AI laten inschatten" },
                   { value: "manual", label: "Handmatig invullen" },
+                  { value: "estimate", label: "Gemiddeld inschatten" },
                   { value: "skip", label: "Overslaan" },
                 ].map((option) => {
                   const checked = side.openingMode === option.value;
@@ -541,6 +624,63 @@ export default function VisualisatiePage() {
             {side.openingMode === "none" ? (
               <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
                 Deze zijde heeft geen ramen, deuren of andere openingen.
+              </div>
+            ) : null}
+
+            {side.openingMode === "estimate" ? (
+              <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div>
+                  <h3 className="font-semibold text-black">Gemiddelde inschatting</h3>
+                  <p className="text-sm text-gray-600">
+                    Vul het aantal kozijnen in. Wij rekenen daarna automatisch met
+                    een gemiddelde oppervlakte per kozijn. Je kunt dit later altijd
+                    handmatig corrigeren.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-800">
+                      Aantal kozijnen (ramen + deuren)
+                    </label>
+                    <input
+                      className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
+                      inputMode="numeric"
+                      value={side.frameCount}
+                      onChange={(e) => setSideField(side.id, "frameCount", e.target.value)}
+                      placeholder="Bijv. 8"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-800">
+                      Gemiddelde grootte kozijnen
+                    </label>
+                    <select
+                      className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
+                      value={side.frameSizeType}
+                      onChange={(e) =>
+                        setSideField(side.id, "frameSizeType", e.target.value as FrameSizeType)
+                      }
+                    >
+                      <option value="small">Klein – gemiddeld 1,0 m² per kozijn</option>
+                      <option value="medium">Gemiddeld – gemiddeld 1,6 m² per kozijn</option>
+                      <option value="large">Groot – gemiddeld 2,5 m² per kozijn</option>
+                    </select>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  Wij rekenen automatisch met een gemiddelde oppervlakte per kozijn.
+                  Pas dit later handmatig aan indien nodig.
+                </p>
+
+                {toNumber(side.frameCount) > 0 ? (
+                  <div className="rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-700">
+                    Geschatte aftrek:{" "}
+                    <strong>{getEstimatedDeductionM2(side).toFixed(2)} m²</strong>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -600,7 +740,12 @@ export default function VisualisatiePage() {
                               className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
                               value={opening.type}
                               onChange={(e) =>
-                                updateOpening(side.id, opening.id, "type", e.target.value)
+                                updateOpening(
+                                  side.id,
+                                  opening.id,
+                                  "type",
+                                  e.target.value as OpeningType
+                                )
                               }
                             >
                               <option value="window">Raam</option>
@@ -711,7 +856,12 @@ export default function VisualisatiePage() {
                           className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
                           value={opening.type}
                           onChange={(e) =>
-                            updateOpening(side.id, opening.id, "type", e.target.value)
+                            updateOpening(
+                              side.id,
+                              opening.id,
+                              "type",
+                              e.target.value as OpeningType
+                            )
                           }
                         >
                           <option value="window">Raam</option>
@@ -775,6 +925,24 @@ export default function VisualisatiePage() {
               </div>
             ) : null}
 
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <div className="mb-2 text-sm font-semibold text-gray-800">Berekening zijde</div>
+              <div className="grid gap-2 text-sm text-gray-700 md:grid-cols-3">
+                <div className="rounded-xl bg-white p-3">
+                  <div className="text-gray-500">Bruto oppervlak</div>
+                  <div className="mt-1 font-semibold">{getGrossAreaM2(side).toFixed(2)} m²</div>
+                </div>
+                <div className="rounded-xl bg-white p-3">
+                  <div className="text-gray-500">Aftrek ramen/deuren</div>
+                  <div className="mt-1 font-semibold">{getOpeningAreaM2(side).toFixed(2)} m²</div>
+                </div>
+                <div className="rounded-xl bg-white p-3">
+                  <div className="text-gray-500">Netto oppervlak</div>
+                  <div className="mt-1 font-semibold">{getNetAreaM2(side).toFixed(2)} m²</div>
+                </div>
+              </div>
+            </div>
+
             {side.error ? (
               <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
                 {side.error}
@@ -782,6 +950,24 @@ export default function VisualisatiePage() {
             ) : null}
           </section>
         ))}
+
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <h3 className="mb-3 text-lg font-semibold text-black">Totaaloverzicht</h3>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div className="text-sm text-gray-500">Totaal bruto</div>
+              <div className="mt-1 text-lg font-semibold">{totals.gross.toFixed(2)} m²</div>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div className="text-sm text-gray-500">Totaal aftrek</div>
+              <div className="mt-1 text-lg font-semibold">{totals.opening.toFixed(2)} m²</div>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div className="text-sm text-gray-500">Totaal netto</div>
+              <div className="mt-1 text-lg font-semibold">{totals.net.toFixed(2)} m²</div>
+            </div>
+          </div>
+        </section>
 
         <section className="flex flex-col gap-3 sm:flex-row">
           <button
@@ -811,8 +997,9 @@ export default function VisualisatiePage() {
 
         <section className="rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm">
           AI geeft een eerste inschatting op basis van foto plus opgegeven
-          zijdebreedte en zijdehoogte. Controleer en corrigeer de voorgestelde
-          ramen en deuren altijd voordat je verdergaat.
+          zijdebreedte en zijdehoogte. De optie “Gemiddeld inschatten” rekent met
+          een vaste gemiddelde oppervlakte per kozijn: klein 1,0 m², gemiddeld 1,6
+          m² en groot 2,5 m².
         </section>
       </div>
     </main>
