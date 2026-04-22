@@ -13,6 +13,7 @@ type Side = {
   image?: string;
   imageName?: string;
   imageError?: string;
+  linkToSide?: number;
 };
 
 type MaterialType = 'plastic' | 'hardwood' | 'paint';
@@ -41,6 +42,9 @@ const translations: Record<Language, Record<string, string>> = {
     side: 'Zijde',
     addSide: '+ Voeg volgende zijde toe',
     remove: 'Verwijder',
+    duplicateSide: 'Dupliceer zijde',
+    useSizeFrom: 'Gebruik maat van',
+    manualSize: 'Handmatig',
     aiEstimate: 'AI schatting',
     width: 'Breedte (m)',
     height: 'Hoogte (m)',
@@ -61,6 +65,8 @@ const translations: Record<Language, Record<string, string>> = {
     areaStep: 'Stap 1 – Oppervlakteberekening',
     materialStep: 'Stap 2 – Materiaalberekening',
     visualisation: 'Visualisatie',
+    goToMaterial: '➡️ Ga naar materiaalberekening',
+    backToArea: '⬅️ Terug naar oppervlakteberekening',
 
     result: 'Resultaat',
     gross: 'Bruto',
@@ -115,6 +121,9 @@ const translations: Record<Language, Record<string, string>> = {
     side: 'Side',
     addSide: '+ Add next side',
     remove: 'Remove',
+    duplicateSide: 'Duplicate side',
+    useSizeFrom: 'Use size from',
+    manualSize: 'Manual',
     aiEstimate: 'AI estimate',
     width: 'Width (m)',
     height: 'Height (m)',
@@ -135,6 +144,8 @@ const translations: Record<Language, Record<string, string>> = {
     areaStep: 'Step 1 – Surface calculation',
     materialStep: 'Step 2 – Material calculation',
     visualisation: 'Visualization',
+    goToMaterial: '➡️ Go to material calculation',
+    backToArea: '⬅️ Back to surface calculation',
 
     result: 'Result',
     gross: 'Gross',
@@ -194,6 +205,7 @@ function createSide(id: number, t: Record<string, string>): Side {
     image: undefined,
     imageName: '',
     imageError: '',
+    linkToSide: undefined,
   };
 }
 
@@ -221,8 +233,39 @@ export default function Page() {
     setSides((prev) => [...prev, createSide(prev.length + 1, t)]);
   }
 
+  function duplicateSide(id: number) {
+    setSides((prev) => {
+      const source = prev.find((s) => s.id === id);
+      if (!source) return prev;
+
+      const newId = prev.length > 0 ? Math.max(...prev.map((s) => s.id)) + 1 : 1;
+
+      const clone: Side = {
+        id: newId,
+        name: `${t.side} ${newId}`,
+        width: source.width,
+        height: source.height,
+        deductionMode: source.deductionMode,
+        deductionM2: source.deductionM2,
+        aiDeductionM2: source.aiDeductionM2,
+        image: undefined,
+        imageName: '',
+        imageError: '',
+        linkToSide: source.linkToSide,
+      };
+
+      return [...prev, clone];
+    });
+  }
+
   function removeSide(id: number) {
-    setSides((prev) => (prev.length === 1 ? prev : prev.filter((s) => s.id !== id)));
+    setSides((prev) => {
+      if (prev.length === 1) return prev;
+      const filtered = prev.filter((s) => s.id !== id);
+      return filtered.map((s) =>
+        s.linkToSide === id ? { ...s, linkToSide: undefined } : s
+      );
+    });
   }
 
   function updateSide(id: number, patch: Partial<Side>) {
@@ -265,8 +308,7 @@ export default function Page() {
 
   function handleReferenceImage(file: File | undefined, type: 'plastic' | 'wood') {
     const result = validateImage(file);
-    if (!file) return;
-    if (!result.ok) return;
+    if (!file || !result.ok) return;
 
     if (type === 'plastic') {
       setPlasticRef(uploadPreview(file));
@@ -307,13 +349,23 @@ export default function Page() {
 
   const calculatedSides = useMemo(() => {
     return sides.map((side) => {
-      const width = toNum(side.width);
-      const height = toNum(side.height);
+      let width = toNum(side.width);
+      let height = toNum(side.height);
+
+      if (side.linkToSide) {
+        const ref = sides.find((s) => s.id === side.linkToSide);
+        if (ref) {
+          width = toNum(ref.width);
+          height = toNum(ref.height);
+        }
+      }
+
       const grossM2 = width * height;
       const deduction = side.deductionMode === 'ai' ? toNum(side.aiDeductionM2) : toNum(side.deductionM2);
       const safeDeduction = Math.min(grossM2, Math.max(0, deduction));
       const netM2 = Math.max(0, grossM2 - safeDeduction);
-      return { ...side, grossM2, safeDeduction, netM2 };
+
+      return { ...side, calculatedWidth: width, calculatedHeight: height, grossM2, safeDeduction, netM2 };
     });
   }, [sides]);
 
@@ -349,9 +401,9 @@ export default function Page() {
     const plankHeightM = Math.max(0.01, toNum(plankHeightMm) / 1000);
     const plankLengthM = Math.max(0.1, toNum(unitSize));
 
-    const totalRows = calculatedSides.reduce((sum, s) => sum + rowsForSide(s.height, plankHeightM), 0);
+    const totalRows = calculatedSides.reduce((sum, s) => sum + rowsForSide(s.calculatedHeight, plankHeightM), 0);
     const totalLinearMeters = calculatedSides.reduce(
-      (sum, s) => sum + rowsForSide(s.height, plankHeightM) * toNum(s.width),
+      (sum, s) => sum + rowsForSide(s.calculatedHeight, plankHeightM) * toNum(s.calculatedWidth),
       0
     );
     const planks = (totalLinearMeters / plankLengthM) * wasteFactor;
@@ -400,7 +452,7 @@ export default function Page() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 24 }}>
           <div>
-            <div style={cardStyle}>
+            <div id="oppervlakte" style={cardStyle}>
               <h2>{t.areaStep}</h2>
 
               {calculatedSides.map((side) => (
@@ -413,6 +465,7 @@ export default function Page() {
                     />
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <button onClick={() => runAiEstimate(side.id)} style={btnSecondary}>{t.aiEstimate}</button>
+                      <button onClick={() => duplicateSide(side.id)} style={btnSecondary}>{t.duplicateSide}</button>
                       <button onClick={() => removeSide(side.id)} style={btnSecondary}>{t.remove}</button>
                     </div>
                   </div>
@@ -447,13 +500,53 @@ export default function Page() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 16 }}>
                     <div>
-                      <label>{t.width}</label>
-                      <input value={side.width} onChange={(e) => updateSide(side.id, { width: e.target.value })} style={inputStyle} />
+                      <label>{t.useSizeFrom}</label>
+                      <select
+                        value={side.linkToSide ?? ''}
+                        onChange={(e) =>
+                          updateSide(side.id, {
+                            linkToSide: e.target.value ? Number(e.target.value) : undefined,
+                          })
+                        }
+                        style={inputStyle}
+                      >
+                        <option value="">{t.manualSize}</option>
+                        {sides
+                          .filter((s) => s.id !== side.id)
+                          .map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                      </select>
                     </div>
+
+                    <div>
+                      <label>{t.width}</label>
+                      <input
+                        value={side.linkToSide ? String(side.calculatedWidth) : side.width}
+                        onChange={(e) => updateSide(side.id, { width: e.target.value })}
+                        style={{
+                          ...inputStyle,
+                          background: side.linkToSide ? '#e2e8f0' : '#fff',
+                        }}
+                        disabled={!!side.linkToSide}
+                      />
+                    </div>
+
                     <div>
                       <label>{t.height}</label>
-                      <input value={side.height} onChange={(e) => updateSide(side.id, { height: e.target.value })} style={inputStyle} />
+                      <input
+                        value={side.linkToSide ? String(side.calculatedHeight) : side.height}
+                        onChange={(e) => updateSide(side.id, { height: e.target.value })}
+                        style={{
+                          ...inputStyle,
+                          background: side.linkToSide ? '#e2e8f0' : '#fff',
+                        }}
+                        disabled={!!side.linkToSide}
+                      />
                     </div>
+
                     <div>
                       <label>{t.deductionMode}</label>
                       <select
@@ -465,6 +558,7 @@ export default function Page() {
                         <option value="ai">{t.automaticAi}</option>
                       </select>
                     </div>
+
                     <div>
                       <label>{side.deductionMode === 'ai' ? t.aiDeduction : t.manualDeduction}</label>
                       <input
@@ -537,7 +631,17 @@ export default function Page() {
                 </div>
               ))}
 
-              <button onClick={addSide} style={btnPrimary}>{t.addSide}</button>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <button onClick={addSide} style={btnPrimary}>{t.addSide}</button>
+                <button
+                  onClick={() => {
+                    document.getElementById('materiaal')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  style={{ ...btnPrimary, background: '#2563eb' }}
+                >
+                  {t.goToMaterial}
+                </button>
+              </div>
 
               <div style={{ ...sectionStyle, marginTop: 24 }}>
                 <div style={{ fontWeight: 700, marginBottom: 12 }}>{t.result}</div>
@@ -549,8 +653,17 @@ export default function Page() {
           </div>
 
           <div>
-            <div style={cardStyle}>
+            <div id="materiaal" style={cardStyle}>
               <h2>{t.materialStep}</h2>
+
+              <button
+                onClick={() => {
+                  document.getElementById('oppervlakte')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                style={{ ...btnSecondary, marginBottom: 16, width: '100%' }}
+              >
+                {t.backToArea}
+              </button>
 
               <div>
                 <label>{t.solution}</label>
