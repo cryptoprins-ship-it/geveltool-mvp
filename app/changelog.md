@@ -1,4 +1,13 @@
 # Changelog
+## v0.9
+- Visualisatie per zijde toegevoegd
+- Per zijde keuze toegevoegd: geen openingen, AI laten inschatten, handmatig invullen of overslaan
+- Preview per zijde toegevoegd voor foto of gekozen bestand
+- AI-inschatting van kozijnen en openingen toegevoegd op basis van foto plus ingevulde breedte en hoogte van de zijde
+- Handmatige correctie van AI-resultaten toegevoegd
+- Ondersteuning toegevoegd voor meerdere zijdes met afzonderlijke foto’s en instellingen
+- Backend API-routes toegevoegd voor openingenanalyse en visualisatieverwerking
+- Netto geveloppervlak per zijde en totaalberekening voorbereid op basis van openingen
 
 ## v0.8
 - Uploadknop opgesplitst in Maak foto en Kies bestand
