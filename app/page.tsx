@@ -14,16 +14,17 @@ type Side = {
 };
 
 type MaterialType = 'plastic' | 'hardwood' | 'paint';
+type Language = 'nl' | 'en';
 
 function toNum(value: string | number) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 }
 
-function createSide(id: number): Side {
+function createSide(id: number, t: Record<string, string>): Side {
   return {
     id,
-    name: `Zijde ${id}`,
+    name: `${t.side} ${id}`,
     width: '',
     height: '',
     deductionMode: 'manual',
@@ -38,8 +39,128 @@ function uploadPreview(file?: File) {
   return URL.createObjectURL(file);
 }
 
+const translations: Record<Language, Record<string, string>> = {
+  nl: {
+    appTitle: 'GevelTool MVP',
+    intro:
+      'Upload foto’s per gevelzijde, vul breedte en hoogte in, trek kozijnen handmatig of via AI-schatting af en vergelijk direct kunststof, hardhout of verf.',
+    side: 'Zijde',
+    sidesTitle: 'Gevelzijdes',
+    materialPrice: 'Materiaal en prijs',
+    visualisation: 'Visualisatie',
+    goal: 'Doel: van foto naar berekening en visualisatie in één workflow.',
+    aiEstimate: 'AI schatting',
+    remove: 'Verwijder',
+    width: 'Breedte (m)',
+    height: 'Hoogte (m)',
+    deductionMode: 'Aftrekmodus',
+    manual: 'Handmatig',
+    automaticAi: 'AI automatisch',
+    aiDeduction: 'AI aftrek m²',
+    manualDeduction: 'Handmatige aftrek m²',
+    sidePhoto: 'Laad hier uw foto in',
+    photoFormats: 'Ondersteund: JPG, PNG of WEBP',
+    result: 'Resultaat',
+    gross: 'Bruto',
+    deduction: 'Aftrek',
+    net: 'Netto',
+    addSide: '+ Voeg volgende zijde toe',
+    solution: 'Oplossing',
+    plasticBoards: 'Kunststof planken',
+    hardwoodBoards: 'Hardhout planken',
+    paint: 'Verf',
+    layers: 'Aantal lagen',
+    coverage: 'Dekking per liter (m²)',
+    boardHeight: 'Werkende plankhoogte (mm)',
+    boardLength: 'Planklengte (m)',
+    pricePerLiter: 'Prijs per liter (€)',
+    pricePerBoard: 'Prijs per plank (€)',
+    waste: 'Snijverlies / reserve (%)',
+    discount: 'Korting (%)',
+    grossSurface: 'Bruto oppervlak',
+    deductionOpenings: 'Aftrek openingen',
+    netSurface: 'Netto oppervlak',
+    totalRows: 'Totaal rijen',
+    needed: 'Benodigd',
+    estimatedCost: 'Indicatieve kosten',
+    liters: 'liter',
+    boards: 'planken',
+    plastic: 'Kunststof',
+    hardwood: 'Hardhout',
+    paintLabel: 'Verf',
+    plasticRef: 'Laad hier uw kunststof voorbeeld in',
+    hardwoodRef: 'Laad hier uw hardhout voorbeeld in',
+    paintColor: 'Verfkleur',
+    overlay: 'Overlay zichtbaarheid',
+    direction: 'Richting',
+    horizontal: 'Horizontaal',
+    vertical: 'Verticaal',
+    language: 'Taal',
+  },
+  en: {
+    appTitle: 'FacadeTool MVP',
+    intro:
+      'Upload photos per facade side, enter width and height, subtract frames manually or with an AI estimate, and compare plastic cladding, hardwood or paint.',
+    side: 'Side',
+    sidesTitle: 'Facade sides',
+    materialPrice: 'Material and price',
+    visualisation: 'Visualisation',
+    goal: 'Goal: from photo to calculation and visualisation in one workflow.',
+    aiEstimate: 'AI estimate',
+    remove: 'Remove',
+    width: 'Width (m)',
+    height: 'Height (m)',
+    deductionMode: 'Deduction mode',
+    manual: 'Manual',
+    automaticAi: 'AI automatic',
+    aiDeduction: 'AI deduction m²',
+    manualDeduction: 'Manual deduction m²',
+    sidePhoto: 'Upload your photo here',
+    photoFormats: 'Supported: JPG, PNG or WEBP',
+    result: 'Result',
+    gross: 'Gross',
+    deduction: 'Deduction',
+    net: 'Net',
+    addSide: '+ Add next side',
+    solution: 'Solution',
+    plasticBoards: 'Plastic boards',
+    hardwoodBoards: 'Hardwood boards',
+    paint: 'Paint',
+    layers: 'Number of coats',
+    coverage: 'Coverage per liter (m²)',
+    boardHeight: 'Effective board height (mm)',
+    boardLength: 'Board length (m)',
+    pricePerLiter: 'Price per liter (€)',
+    pricePerBoard: 'Price per board (€)',
+    waste: 'Waste / reserve (%)',
+    discount: 'Discount (%)',
+    grossSurface: 'Gross surface',
+    deductionOpenings: 'Opening deduction',
+    netSurface: 'Net surface',
+    totalRows: 'Total rows',
+    needed: 'Required',
+    estimatedCost: 'Estimated cost',
+    liters: 'liter',
+    boards: 'boards',
+    plastic: 'Plastic',
+    hardwood: 'Hardwood',
+    paintLabel: 'Paint',
+    plasticRef: 'Upload your plastic reference here',
+    hardwoodRef: 'Upload your hardwood reference here',
+    paintColor: 'Paint color',
+    overlay: 'Overlay visibility',
+    direction: 'Direction',
+    horizontal: 'Horizontal',
+    vertical: 'Vertical',
+    language: 'Language',
+  },
+};
+
 export default function Page() {
-  const [sides, setSides] = useState<Side[]>([createSide(1)]);
+  const [language, setLanguage] = useState<Language>('nl');
+  const t = translations[language];
+
+  const [sides, setSides] = useState<Side[]>([createSide(1, t)]);
   const [material, setMaterial] = useState<MaterialType>('plastic');
   const [unitSize, setUnitSize] = useState('4');
   const [unitPrice, setUnitPrice] = useState('34.5');
@@ -55,7 +176,7 @@ export default function Page() {
   const [paintColor, setPaintColor] = useState('#d9d4ca');
 
   function addSide() {
-    setSides((prev) => [...prev, createSide(prev.length + 1)]);
+    setSides((prev) => [...prev, createSide(prev.length + 1, t)]);
   }
 
   function removeSide(id: number) {
@@ -125,7 +246,7 @@ export default function Page() {
         deductionM2,
         netM2,
         quantity: litersWithWaste,
-        quantityLabel: 'liter',
+        quantityLabel: t.liters,
         rows: 0,
         totalPrice,
       };
@@ -146,11 +267,11 @@ export default function Page() {
       deductionM2,
       netM2,
       quantity: planks,
-      quantityLabel: 'planken',
+      quantityLabel: t.boards,
       rows: totalRows,
       totalPrice,
     };
-  }, [calculatedSides, material, layers, unitPrice, unitSize, plankHeightMm, wastePercent, discountPercent]);
+  }, [calculatedSides, material, layers, unitPrice, unitSize, plankHeightMm, wastePercent, discountPercent, t]);
 
   const currentTexture =
     selectedVisual === 'plastic' ? plasticRef : selectedVisual === 'hardwood' ? woodRef : undefined;
@@ -158,17 +279,30 @@ export default function Page() {
   return (
     <main style={{ minHeight: '100vh', background: '#f8fafc', padding: 24, fontFamily: 'Arial, sans-serif', color: '#000' }}>
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+          <div style={{ minWidth: 180 }}>
+            <label>{t.language}</label>
+            <select value={language} onChange={(e) => setLanguage(e.target.value as Language)} style={inputStyle}>
+              <option value="nl">Nederlands</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+
         <div style={{ background: '#fff', borderRadius: 24, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,.08)', marginBottom: 24 }}>
-          <h1 style={{ fontSize: 32, margin: 0 }}>GevelTool MVP</h1>
+          <h1 style={{ fontSize: 32, margin: 0 }}>{t.appTitle}</h1>
           <p style={{ color: '#000', marginTop: 12 }}>
-            Upload foto’s per gevelzijde, vul breedte en hoogte in, trek kozijnen handmatig of via AI-schatting af en vergelijk direct kunststof, hardhout of verf.
+            {t.intro}
           </p>
+          <div style={{ marginTop: 12, color: '#000', fontWeight: 600 }}>
+            {t.goal}
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 24 }}>
           <div>
             <div style={{ background: '#fff', borderRadius: 24, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>
-              <h2>Gevelzijdes</h2>
+              <h2>{t.sidesTitle}</h2>
 
               {calculatedSides.map((side) => (
                 <div key={side.id} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 18, padding: 16, marginBottom: 16 }}>
@@ -179,33 +313,33 @@ export default function Page() {
                       style={{ padding: 10, borderRadius: 12, border: '1px solid #cbd5e1', minWidth: 180, color: '#000' }}
                     />
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => runAiEstimate(side.id)} style={btnSecondary}>AI schatting</button>
-                      <button onClick={() => removeSide(side.id)} style={btnSecondary}>Verwijder</button>
+                      <button onClick={() => runAiEstimate(side.id)} style={btnSecondary}>{t.aiEstimate}</button>
+                      <button onClick={() => removeSide(side.id)} style={btnSecondary}>{t.remove}</button>
                     </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                     <div>
-                      <label>Breedte (m)</label>
+                      <label>{t.width}</label>
                       <input value={side.width} onChange={(e) => updateSide(side.id, { width: e.target.value })} style={inputStyle} />
                     </div>
                     <div>
-                      <label>Hoogte (m)</label>
+                      <label>{t.height}</label>
                       <input value={side.height} onChange={(e) => updateSide(side.id, { height: e.target.value })} style={inputStyle} />
                     </div>
                     <div>
-                      <label>Aftrekmodus</label>
+                      <label>{t.deductionMode}</label>
                       <select
                         value={side.deductionMode}
                         onChange={(e) => updateSide(side.id, { deductionMode: e.target.value as 'manual' | 'ai' })}
                         style={inputStyle}
                       >
-                        <option value="manual">Handmatig</option>
-                        <option value="ai">AI automatisch</option>
+                        <option value="manual">{t.manual}</option>
+                        <option value="ai">{t.automaticAi}</option>
                       </select>
                     </div>
                     <div>
-                      <label>{side.deductionMode === 'ai' ? 'AI aftrek m²' : 'Handmatige aftrek m²'}</label>
+                      <label>{side.deductionMode === 'ai' ? t.aiDeduction : t.manualDeduction}</label>
                       <input
                         value={side.deductionMode === 'ai' ? side.aiDeductionM2 : side.deductionM2}
                         onChange={(e) =>
@@ -221,22 +355,23 @@ export default function Page() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 230px', gap: 16, marginTop: 16 }}>
                     <div>
-                      <label>Foto van deze zijde</label>
+                      <label>{t.sidePhoto}</label>
                       <div style={{ marginTop: 6 }}>
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/jpeg, image/png, image/webp"
                           onChange={(e) => updateSide(side.id, { image: uploadPreview(e.target.files?.[0]) })}
                           style={{ color: '#000' }}
                         />
+                        <div style={{ fontSize: 12, marginTop: 6 }}>{t.photoFormats}</div>
                       </div>
                     </div>
 
                     <div style={{ background: '#fff', borderRadius: 16, padding: 16, border: '1px solid #e2e8f0', color: '#000' }}>
-                      <div style={{ fontWeight: 700, marginBottom: 10 }}>Resultaat</div>
-                      <div style={rowStyle}><span>Bruto</span><span>{side.grossM2.toFixed(2)} m²</span></div>
-                      <div style={rowStyle}><span>Aftrek</span><span>{side.safeDeduction.toFixed(2)} m²</span></div>
-                      <div style={{ ...rowStyle, fontWeight: 700 }}><span>Netto</span><span>{side.netM2.toFixed(2)} m²</span></div>
+                      <div style={{ fontWeight: 700, marginBottom: 10 }}>{t.result}</div>
+                      <div style={rowStyle}><span>{t.gross}</span><span>{side.grossM2.toFixed(2)} m²</span></div>
+                      <div style={rowStyle}><span>{t.deduction}</span><span>{side.safeDeduction.toFixed(2)} m²</span></div>
+                      <div style={{ ...rowStyle, fontWeight: 700 }}><span>{t.net}</span><span>{side.netM2.toFixed(2)} m²</span></div>
                     </div>
                   </div>
 
@@ -290,42 +425,42 @@ export default function Page() {
                 </div>
               ))}
 
-              <button onClick={addSide} style={btnPrimary}>+ Voeg volgende zijde toe</button>
+              <button onClick={addSide} style={btnPrimary}>{t.addSide}</button>
             </div>
           </div>
 
           <div>
             <div style={{ background: '#fff', borderRadius: 24, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,.08)', marginBottom: 24 }}>
-              <h2>Materiaal en prijs</h2>
+              <h2>{t.materialPrice}</h2>
 
               <div style={{ marginBottom: 12 }}>
-                <label>Oplossing</label>
+                <label>{t.solution}</label>
                 <select value={material} onChange={(e) => updateMaterial(e.target.value as MaterialType)} style={inputStyle}>
-                  <option value="plastic">Kunststof planken</option>
-                  <option value="hardwood">Hardhout planken</option>
-                  <option value="paint">Verf</option>
+                  <option value="plastic">{t.plasticBoards}</option>
+                  <option value="hardwood">{t.hardwoodBoards}</option>
+                  <option value="paint">{t.paint}</option>
                 </select>
               </div>
 
               {material === 'paint' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label>Aantal lagen</label>
+                    <label>{t.layers}</label>
                     <input value={layers} onChange={(e) => setLayers(e.target.value)} style={inputStyle} />
                   </div>
                   <div>
-                    <label>Dekking per liter (m²)</label>
+                    <label>{t.coverage}</label>
                     <input value={unitSize} onChange={(e) => setUnitSize(e.target.value)} style={inputStyle} />
                   </div>
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label>Werkende plankhoogte (mm)</label>
+                    <label>{t.boardHeight}</label>
                     <input value={plankHeightMm} onChange={(e) => setPlankHeightMm(e.target.value)} style={inputStyle} />
                   </div>
                   <div>
-                    <label>Planklengte (m)</label>
+                    <label>{t.boardLength}</label>
                     <input value={unitSize} onChange={(e) => setUnitSize(e.target.value)} style={inputStyle} />
                   </div>
                 </div>
@@ -333,60 +468,60 @@ export default function Page() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
                 <div>
-                  <label>{material === 'paint' ? 'Prijs per liter (€)' : 'Prijs per plank (€)'}</label>
+                  <label>{material === 'paint' ? t.pricePerLiter : t.pricePerBoard}</label>
                   <input value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} style={inputStyle} />
                 </div>
                 <div>
-                  <label>Snijverlies / reserve (%)</label>
+                  <label>{t.waste}</label>
                   <input value={wastePercent} onChange={(e) => setWastePercent(e.target.value)} style={inputStyle} />
                 </div>
               </div>
 
               <div style={{ marginTop: 12 }}>
-                <label>Korting (%)</label>
+                <label>{t.discount}</label>
                 <input value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)} style={inputStyle} />
               </div>
 
               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16, marginTop: 16, color: '#000' }}>
-                <div style={rowStyle}><span>Bruto oppervlak</span><span>{totals.grossM2.toFixed(2)} m²</span></div>
-                <div style={rowStyle}><span>Aftrek openingen</span><span>{totals.deductionM2.toFixed(2)} m²</span></div>
-                <div style={{ ...rowStyle, fontWeight: 700 }}><span>Netto oppervlak</span><span>{totals.netM2.toFixed(2)} m²</span></div>
-                {material !== 'paint' && <div style={rowStyle}><span>Totaal rijen</span><span>{totals.rows}</span></div>}
-                <div style={rowStyle}><span>Benodigd</span><span>{totals.quantity.toFixed(1)} {totals.quantityLabel}</span></div>
-                <div style={{ ...rowStyle, fontSize: 18, fontWeight: 700 }}><span>Indicatieve kosten</span><span>€ {totals.totalPrice.toFixed(2)}</span></div>
+                <div style={rowStyle}><span>{t.grossSurface}</span><span>{totals.grossM2.toFixed(2)} m²</span></div>
+                <div style={rowStyle}><span>{t.deductionOpenings}</span><span>{totals.deductionM2.toFixed(2)} m²</span></div>
+                <div style={{ ...rowStyle, fontWeight: 700 }}><span>{t.netSurface}</span><span>{totals.netM2.toFixed(2)} m²</span></div>
+                {material !== 'paint' && <div style={rowStyle}><span>{t.totalRows}</span><span>{totals.rows}</span></div>}
+                <div style={rowStyle}><span>{t.needed}</span><span>{totals.quantity.toFixed(1)} {totals.quantityLabel}</span></div>
+                <div style={{ ...rowStyle, fontSize: 18, fontWeight: 700 }}><span>{t.estimatedCost}</span><span>€ {totals.totalPrice.toFixed(2)}</span></div>
               </div>
             </div>
 
             <div style={{ background: '#fff', borderRadius: 24, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>
-              <h2>Visualisatie</h2>
+              <h2>{t.visualisation}</h2>
 
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                <button onClick={() => setSelectedVisual('plastic')} style={selectedVisual === 'plastic' ? btnPrimary : btnSecondary}>Kunststof</button>
-                <button onClick={() => setSelectedVisual('hardwood')} style={selectedVisual === 'hardwood' ? btnPrimary : btnSecondary}>Hardhout</button>
-                <button onClick={() => setSelectedVisual('paint')} style={selectedVisual === 'paint' ? btnPrimary : btnSecondary}>Verf</button>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                <button onClick={() => setSelectedVisual('plastic')} style={selectedVisual === 'plastic' ? btnPrimary : btnSecondary}>{t.plastic}</button>
+                <button onClick={() => setSelectedVisual('hardwood')} style={selectedVisual === 'hardwood' ? btnPrimary : btnSecondary}>{t.hardwood}</button>
+                <button onClick={() => setSelectedVisual('paint')} style={selectedVisual === 'paint' ? btnPrimary : btnSecondary}>{t.paintLabel}</button>
               </div>
 
               {selectedVisual === 'plastic' && (
                 <div style={{ marginBottom: 16 }}>
-                  <label>Referentiefoto kunststof</label>
+                  <label>{t.plasticRef}</label>
                   <div style={{ marginTop: 6 }}>
-                    <input type="file" accept="image/*" onChange={(e) => setPlasticRef(uploadPreview(e.target.files?.[0]))} style={{ color: '#000' }} />
+                    <input type="file" accept="image/jpeg, image/png, image/webp" onChange={(e) => setPlasticRef(uploadPreview(e.target.files?.[0]))} style={{ color: '#000' }} />
                   </div>
                 </div>
               )}
 
               {selectedVisual === 'hardwood' && (
                 <div style={{ marginBottom: 16 }}>
-                  <label>Referentiefoto hardhout</label>
+                  <label>{t.hardwoodRef}</label>
                   <div style={{ marginTop: 6 }}>
-                    <input type="file" accept="image/*" onChange={(e) => setWoodRef(uploadPreview(e.target.files?.[0]))} style={{ color: '#000' }} />
+                    <input type="file" accept="image/jpeg, image/png, image/webp" onChange={(e) => setWoodRef(uploadPreview(e.target.files?.[0]))} style={{ color: '#000' }} />
                   </div>
                 </div>
               )}
 
               {selectedVisual === 'paint' && (
                 <div style={{ marginBottom: 16 }}>
-                  <label>Verfkleur</label>
+                  <label>{t.paintColor}</label>
                   <div style={{ marginTop: 6 }}>
                     <input type="color" value={paintColor} onChange={(e) => setPaintColor(e.target.value)} />
                   </div>
@@ -394,7 +529,7 @@ export default function Page() {
               )}
 
               <div style={{ marginBottom: 16 }}>
-                <label>Overlay zichtbaarheid: {overlayOpacity}%</label>
+                <label>{t.overlay}: {overlayOpacity}%</label>
                 <input
                   type="range"
                   min="0"
@@ -406,10 +541,10 @@ export default function Page() {
               </div>
 
               <div>
-                <label>Richting</label>
+                <label>{t.direction}</label>
                 <select value={orientation} onChange={(e) => setOrientation(e.target.value as 'horizontal' | 'vertical')} style={inputStyle}>
-                  <option value="horizontal">Horizontaal</option>
-                  <option value="vertical">Verticaal</option>
+                  <option value="horizontal">{t.horizontal}</option>
+                  <option value="vertical">{t.vertical}</option>
                 </select>
               </div>
             </div>
