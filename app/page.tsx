@@ -103,17 +103,16 @@ function getLinkedDimensions(side: Side, sides: Side[]) {
   };
 }
 
-function buildDefaultSides(count: number): Side[] {
-  const next = Array.from({ length: count }, (_, index) => createSide(index));
-  if (count >= 2) next[1].linkToSideId = next[0].id;
-  if (count >= 4) next[3].linkToSideId = next[2].id;
-  return next;
+function buildSides(count: number): Side[] {
+  return Array.from({ length: count }, (_, index) => createSide(index));
 }
 
 export default function Page() {
   const [inputMode, setInputMode] = useState<InputMode>("quick");
   const [sideCount, setSideCount] = useState(4);
-  const [sides, setSides] = useState<Side[]>(buildDefaultSides(4));
+  const [frontBackEqual, setFrontBackEqual] = useState<boolean | null>(true);
+  const [leftRightEqual, setLeftRightEqual] = useState<boolean | null>(true);
+  const [sides, setSides] = useState<Side[]>(buildSides(4));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState("");
   const [aiLoadingSideId, setAiLoadingSideId] = useState<string | null>(null);
@@ -129,6 +128,22 @@ export default function Page() {
     };
   }, [sides]);
 
+  useEffect(() => {
+    setSides((prev) => {
+      const next = prev.map((side) => ({ ...side, linkToSideId: undefined }));
+
+      if (sideCount >= 2 && frontBackEqual) {
+        next[1] = { ...next[1], linkToSideId: next[0].id };
+      }
+
+      if (sideCount >= 4 && leftRightEqual) {
+        next[3] = { ...next[3], linkToSideId: next[2].id };
+      }
+
+      return next;
+    });
+  }, [frontBackEqual, leftRightEqual, sideCount]);
+
   const canContinue = useMemo(() => {
     if (sides.length === 0) return false;
 
@@ -140,17 +155,9 @@ export default function Page() {
       if (!hasBaseDimensions) return false;
 
       if (side.openingMode === "skip" || side.openingMode === "none") return true;
-
-      if (side.openingMode === "estimate") {
-        return toNumber(side.frameCount) > 0;
-      }
-
+      if (side.openingMode === "estimate") return toNumber(side.frameCount) > 0;
       if (!side.photo) return false;
-
-      if (side.openingMode === "ai") {
-        return side.openings.length > 0 || !!side.frameCount;
-      }
-
+      if (side.openingMode === "ai") return side.openings.length > 0 || !!side.frameCount;
       if (side.openingMode === "manual") {
         return (
           side.openings.length > 0 &&
@@ -327,6 +334,7 @@ export default function Page() {
   const addSide = () => {
     setSides((prev) => {
       if (prev.length >= MAX_SIDES) return prev;
+      setSideCount(prev.length + 1);
       return [...prev, createSide(prev.length)];
     });
   };
@@ -336,27 +344,21 @@ export default function Page() {
       const sideToDelete = prev.find((side) => side.id === sideId);
       if (sideToDelete?.previewUrl) URL.revokeObjectURL(sideToDelete.previewUrl);
       const filtered = prev.filter((side) => side.id !== sideId);
+      setSideCount(filtered.length);
       return filtered.map((side, index) => ({ ...side, name: `Zijde ${index + 1}` }));
-    });
-  };
-
-  const applyCommonPairs = () => {
-    setSides((prev) => {
-      const next = [...prev];
-      if (next.length >= 2) next[1] = { ...next[1], linkToSideId: next[0].id };
-      if (next.length >= 4) next[3] = { ...next[3], linkToSideId: next[2].id };
-      return next;
     });
   };
 
   const resetSidesByCount = (count: number) => {
     setSideCount(count);
-    setSides(buildDefaultSides(count));
+    setSides(buildSides(count));
     setGlobalError("");
-  };
 
-  const clearAllLinks = () => {
-    setSides((prev) => prev.map((side) => ({ ...side, linkToSideId: undefined })));
+    if (count < 2) setFrontBackEqual(null);
+    else setFrontBackEqual(true);
+
+    if (count < 4) setLeftRightEqual(null);
+    else setLeftRightEqual(true);
   };
 
   const getWidthValue = (side: Side) => {
@@ -453,12 +455,12 @@ export default function Page() {
 
   return (
     <main className="min-h-screen bg-gray-50 text-black">
-      <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6 pb-28">
+      <div className="mx-auto max-w-5xl space-y-6 p-4 pb-28 md:p-6">
         <section className="rounded-2xl border border-gray-200 bg-white p-4 text-center shadow-sm md:p-6">
           <h1 className="text-3xl font-bold tracking-tight text-black">GevelPlanner</h1>
           <p className="mt-2 text-base font-medium text-gray-700">Bereken je gevel in 2 minuten</p>
           <p className="mt-3 text-sm leading-6 text-gray-600">
-            Minder invoeren, sneller resultaat. Kies eerst hoe simpel of uitgebreid je wilt werken.
+            Minder invoeren, sneller resultaat. Eerst bepaal je of gelijke zijdes automatisch gekoppeld mogen worden.
           </p>
         </section>
 
@@ -473,9 +475,7 @@ export default function Page() {
               }`}
             >
               <div className="font-semibold">Snel invullen</div>
-              <div className="mt-1 text-sm text-gray-600">
-                Aanbevolen. Gebruik aantal kozijnen en gemiddelde groottes.
-              </div>
+              <div className="mt-1 text-sm text-gray-600">Aanbevolen. Gebruik aantal kozijnen en gemiddelde groottes.</div>
             </button>
             <button
               type="button"
@@ -485,16 +485,14 @@ export default function Page() {
               }`}
             >
               <div className="font-semibold">Geavanceerd</div>
-              <div className="mt-1 text-sm text-gray-600">
-                Gebruik AI of vul ramen en deuren handmatig per zijde in.
-              </div>
+              <div className="mt-1 text-sm text-gray-600">Gebruik AI of vul ramen en deuren handmatig per zijde in.</div>
             </button>
           </div>
         </section>
 
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div className="w-full md:max-w-xs">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
               <label className="mb-1 block text-sm font-medium text-gray-800">Aantal zijdes</label>
               <select
                 className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
@@ -507,25 +505,37 @@ export default function Page() {
               </select>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50"
-                onClick={applyCommonPairs}
-              >
-                Koppel veelvoorkomende gelijke zijdes
-              </button>
-              <button
-                type="button"
-                className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50"
-                onClick={clearAllLinks}
-              >
-                Koppelingen wissen
-              </button>
-            </div>
+            {sideCount >= 2 ? (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-800">Zijn voor- en achterkant gelijk?</label>
+                <select
+                  className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
+                  value={frontBackEqual === null ? "unknown" : frontBackEqual ? "yes" : "no"}
+                  onChange={(e) => setFrontBackEqual(e.target.value === "yes")}
+                >
+                  <option value="yes">Ja, koppel automatisch</option>
+                  <option value="no">Nee, apart invullen</option>
+                </select>
+              </div>
+            ) : null}
+
+            {sideCount >= 4 ? (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-800">Zijn linker- en rechterkant gelijk?</label>
+                <select
+                  className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
+                  value={leftRightEqual === null ? "unknown" : leftRightEqual ? "yes" : "no"}
+                  onChange={(e) => setLeftRightEqual(e.target.value === "yes")}
+                >
+                  <option value="yes">Ja, koppel automatisch</option>
+                  <option value="no">Nee, apart invullen</option>
+                </select>
+              </div>
+            ) : null}
           </div>
+
           <p className="mt-3 text-sm text-gray-600">
-            Standaard koppelen we bij 4 zijdes vaak voor/achter en links/rechts aan elkaar.
+            Alleen de afmetingen worden gekoppeld. Ramen en deuren blijven altijd per zijde apart.
           </p>
         </section>
 
@@ -540,9 +550,7 @@ export default function Page() {
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h2 className="text-xl font-semibold text-black">{side.name}</h2>
-                  <p className="text-sm text-gray-600">
-                    Geef de afmetingen en kies hoe je met ramen en deuren op deze zijde wilt omgaan.
-                  </p>
+                  <p className="text-sm text-gray-600">Geef de afmetingen en kies hoe je met ramen en deuren op deze zijde wilt omgaan.</p>
                 </div>
                 {sides.length > 1 ? (
                   <button
@@ -570,7 +578,7 @@ export default function Page() {
 
                 {linked ? (
                   <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-                    Afmetingen worden overgenomen van {linked.name}.
+                    Afmetingen worden overgenomen van {linked.name}. Ramen en deuren blijven apart voor deze zijde.
                   </div>
                 ) : null}
               </div>
@@ -600,146 +608,65 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <div className="text-sm text-gray-500">Bruto oppervlak zijde</div>
-                <div className="mt-1 text-lg font-semibold text-black">{sideArea.toFixed(2)} m²</div>
+              <div className="space-y-3">
+                <div>
+                  <p className="mb-2 text-sm font-medium text-gray-800">Afbeelding voor deze zijde</p>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button type="button" className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50" onClick={() => cameraInputRefs.current[side.id]?.click()}>
+                      Maak foto
+                    </button>
+                    <button type="button" className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50" onClick={() => fileInputRefs.current[side.id]?.click()}>
+                      Kies bestand
+                    </button>
+                  </div>
+                </div>
+
+                <input ref={(el) => { cameraInputRefs.current[side.id] = el; }} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFileChange(side.id, e)} />
+                <input ref={(el) => { fileInputRefs.current[side.id] = el; }} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(side.id, e)} />
+
+                {side.previewUrl ? (
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                    <p className="mb-2 text-sm font-medium text-gray-800">Preview {side.name}</p>
+                    <img src={side.previewUrl} alt={`Preview van ${side.name}`} className="max-h-[360px] w-full rounded-xl object-contain" />
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-500">
+                    Nog geen afbeelding gekozen voor {side.name.toLowerCase()}.
+                  </div>
+                )}
               </div>
 
               {inputMode === "advanced" ? (
                 <div className="space-y-3">
-                  <div>
-                    <p className="mb-2 text-sm font-medium text-gray-800">Afbeelding voor deze zijde</p>
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                      <button type="button" className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50" onClick={() => cameraInputRefs.current[side.id]?.click()}>
-                        Maak foto
-                      </button>
-                      <button type="button" className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50" onClick={() => fileInputRefs.current[side.id]?.click()}>
-                        Kies bestand
-                      </button>
-                    </div>
-                  </div>
-
-                  <input
-                    ref={(el) => { cameraInputRefs.current[side.id] = el; }}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(e) => handleFileChange(side.id, e)}
-                  />
-                  <input
-                    ref={(el) => { fileInputRefs.current[side.id] = el; }}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleFileChange(side.id, e)}
-                  />
-
-                  {side.previewUrl ? (
-                    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
-                      <p className="mb-2 text-sm font-medium text-gray-800">Preview {side.name}</p>
-                      <img src={side.previewUrl} alt={`Preview van ${side.name}`} className="max-h-[360px] w-full rounded-xl object-contain" />
-                    </div>
-                  ) : null}
-
-                  <div className="space-y-3">
-                    <p className="text-sm font-medium text-gray-800">Ramen en deuren op deze zijde</p>
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                      {(["none", "ai", "manual", "estimate", "skip"] as OpeningMode[]).map((mode) => {
-                        const checked = side.openingMode === mode;
-                        return (
-                          <label
-                            key={mode}
-                            className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition ${checked ? "border-black bg-gray-50" : "border-gray-200 bg-white hover:bg-gray-50"}`}
-                          >
-                            <input type="radio" name={`opening-mode-${side.id}`} checked={checked} onChange={() => handleOpeningModeChange(side.id, mode)} />
-                            <span className="text-sm font-medium text-black">{openingModeLabels[mode]}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
+                  <p className="text-sm font-medium text-gray-800">Ramen en deuren op deze zijde</p>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                    {(["none", "ai", "manual", "estimate", "skip"] as OpeningMode[]).map((mode) => {
+                      const checked = side.openingMode === mode;
+                      return (
+                        <label key={mode} className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition ${checked ? "border-black bg-gray-50" : "border-gray-200 bg-white hover:bg-gray-50"}`}>
+                          <input type="radio" name={`opening-mode-${side.id}`} checked={checked} onChange={() => handleOpeningModeChange(side.id, mode)} />
+                          <span className="text-sm font-medium text-black">{openingModeLabels[mode]}</span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <div>
-                    <h3 className="font-semibold text-black">Snelle modus</h3>
-                    <p className="text-sm text-gray-600">
-                      Vul alleen het aantal kozijnen en de gemiddelde grootte in. Dat is voor de meeste situaties voldoende.
-                    </p>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-800">Aantal kozijnen (ramen + deuren)</label>
-                      <input
-                        className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
-                        inputMode="numeric"
-                        value={side.frameCount}
-                        onChange={(e) => setSideField(side.id, "frameCount", e.target.value)}
-                        placeholder="Bijv. 8"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-800">Gemiddelde grootte kozijnen</label>
-                      <select
-                        className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
-                        value={side.frameSizeType}
-                        onChange={(e) => setSideField(side.id, "frameSizeType", e.target.value as FrameSizeType)}
-                      >
-                        <option value="small">Klein – gemiddeld 1,0 m² per kozijn</option>
-                        <option value="medium">Gemiddeld – gemiddeld 1,6 m² per kozijn</option>
-                        <option value="large">Groot – gemiddeld 2,5 m² per kozijn</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-700">
-                    Geschatte aftrek: <strong>{getEstimatedDeductionM2(side).toFixed(2)} m²</strong>
-                  </div>
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <button
-                      type="button"
-                      className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50"
-                      onClick={() => handleOpeningModeChange(side.id, "estimate")}
-                    >
-                      Gebruik gemiddelde inschatting
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50"
-                      onClick={() => setInputMode("advanced")}
-                    >
-                      Meer opties tonen
-                    </button>
-                  </div>
-                </div>
-              )}
+              ) : null}
 
-              {(side.openingMode === "estimate" || inputMode === "quick") && (
+              {(inputMode === "quick" || side.openingMode === "estimate") && (
                 <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
                   <div>
                     <h3 className="font-semibold text-black">Gemiddelde inschatting</h3>
-                    <p className="text-sm text-gray-600">
-                      Wij rekenen met een gemiddelde oppervlakte per kozijn. Je kunt dit later altijd handmatig aanpassen.
-                    </p>
+                    <p className="text-sm text-gray-600">Vul het aantal kozijnen en de gemiddelde grootte in. Dit is de snelste manier.</p>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-sm font-medium text-gray-800">Aantal kozijnen (ramen + deuren)</label>
-                      <input
-                        className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
-                        inputMode="numeric"
-                        value={side.frameCount}
-                        onChange={(e) => setSideField(side.id, "frameCount", e.target.value)}
-                        placeholder="Bijv. 8"
-                      />
+                      <input className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black" inputMode="numeric" value={side.frameCount} onChange={(e) => setSideField(side.id, "frameCount", e.target.value)} placeholder="Bijv. 8" />
                     </div>
                     <div>
                       <label className="mb-1 block text-sm font-medium text-gray-800">Gemiddelde grootte kozijnen</label>
-                      <select
-                        className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
-                        value={side.frameSizeType}
-                        onChange={(e) => setSideField(side.id, "frameSizeType", e.target.value as FrameSizeType)}
-                      >
+                      <select className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black" value={side.frameSizeType} onChange={(e) => setSideField(side.id, "frameSizeType", e.target.value as FrameSizeType)}>
                         <option value="small">Klein – gemiddeld 1,0 m² per kozijn</option>
                         <option value="medium">Gemiddeld – gemiddeld 1,6 m² per kozijn</option>
                         <option value="large">Groot – gemiddeld 2,5 m² per kozijn</option>
@@ -757,24 +684,15 @@ export default function Page() {
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                       <h3 className="font-semibold text-black">AI-inschatting ramen en deuren</h3>
-                      <p className="text-sm text-gray-600">
-                        AI gebruikt de foto en de ingevulde breedte en hoogte van deze zijde als schaal voor een eerste schatting.
-                      </p>
+                      <p className="text-sm text-gray-600">AI gebruikt de foto en de ingevulde breedte en hoogte van deze zijde als schaal voor een eerste schatting.</p>
                     </div>
-                    <button
-                      type="button"
-                      className="rounded-xl border border-gray-300 bg-white px-4 py-2 font-medium text-black transition hover:bg-gray-100 disabled:opacity-50"
-                      onClick={() => estimateOpeningsWithAi(side)}
-                      disabled={aiLoadingSideId === side.id}
-                    >
+                    <button type="button" className="rounded-xl border border-gray-300 bg-white px-4 py-2 font-medium text-black transition hover:bg-gray-100 disabled:opacity-50" onClick={() => estimateOpeningsWithAi(side)} disabled={aiLoadingSideId === side.id}>
                       {aiLoadingSideId === side.id ? "AI analyseert..." : "Analyseer foto"}
                     </button>
                   </div>
 
                   {side.aiDetectedCount !== null ? (
-                    <div className="rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-700">
-                      AI heeft {side.aiDetectedCount} raam/deur-openingen gevonden.
-                    </div>
+                    <div className="rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-700">AI heeft {side.aiDetectedCount} raam/deur-openingen gevonden.</div>
                   ) : null}
 
                   {side.openings.length > 0 ? (
@@ -783,18 +701,12 @@ export default function Page() {
                         <div key={opening.id} className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4">
                           <div className="flex items-center justify-between">
                             <h4 className="font-medium text-black">Voorgestelde opening {openingIndex + 1}</h4>
-                            <button type="button" className="text-sm text-gray-700 underline" onClick={() => removeOpening(side.id, opening.id)}>
-                              Verwijderen
-                            </button>
+                            <button type="button" className="text-sm text-gray-700 underline" onClick={() => removeOpening(side.id, opening.id)}>Verwijderen</button>
                           </div>
                           <div className="grid gap-3 md:grid-cols-4">
                             <div>
                               <label className="mb-1 block text-sm text-gray-700">Type</label>
-                              <select
-                                className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
-                                value={opening.type}
-                                onChange={(e) => updateOpening(side.id, opening.id, "type", e.target.value as OpeningType)}
-                              >
+                              <select className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black" value={opening.type} onChange={(e) => updateOpening(side.id, opening.id, "type", e.target.value as OpeningType)}>
                                 <option value="window">Raam</option>
                                 <option value="door">Deur</option>
                                 <option value="other">Overig</option>
@@ -820,9 +732,7 @@ export default function Page() {
                       </button>
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-500">
-                      Nog geen AI-resultaten voor deze zijde.
-                    </div>
+                    <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-500">Nog geen AI-resultaten voor deze zijde.</div>
                   )}
                 </div>
               ) : null}
@@ -834,26 +744,18 @@ export default function Page() {
                     <p className="text-sm text-gray-600">Voeg alleen de ramen, deuren of andere openingen toe die op deze zijde aanwezig zijn.</p>
                   </div>
                   {side.openings.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-500">
-                      Nog geen ramen of deuren toegevoegd.
-                    </div>
+                    <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-500">Nog geen ramen of deuren toegevoegd.</div>
                   ) : null}
                   {side.openings.map((opening, openingIndex) => (
                     <div key={opening.id} className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4">
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium text-black">Opening {openingIndex + 1}</h4>
-                        <button type="button" className="text-sm text-gray-700 underline" onClick={() => removeOpening(side.id, opening.id)}>
-                          Verwijderen
-                        </button>
+                        <button type="button" className="text-sm text-gray-700 underline" onClick={() => removeOpening(side.id, opening.id)}>Verwijderen</button>
                       </div>
                       <div className="grid gap-3 md:grid-cols-4">
                         <div>
                           <label className="mb-1 block text-sm text-gray-700">Type</label>
-                          <select
-                            className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
-                            value={opening.type}
-                            onChange={(e) => updateOpening(side.id, opening.id, "type", e.target.value as OpeningType)}
-                          >
+                          <select className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black" value={opening.type} onChange={(e) => updateOpening(side.id, opening.id, "type", e.target.value as OpeningType)}>
                             <option value="window">Raam</option>
                             <option value="door">Deur</option>
                             <option value="other">Overig</option>
@@ -928,7 +830,7 @@ export default function Page() {
         ) : null}
 
         <section className="rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm">
-          AI geeft een eerste inschatting op basis van foto plus opgegeven zijdebreedte en zijdehoogte. Als AI niets bruikbaars vindt, schakelt de app automatisch terug naar de gemiddelde inschatting per kozijn.
+          Alleen de afmetingen kunnen automatisch worden gekoppeld als voor/achter of links/rechts gelijk zijn. Ramen en deuren worden altijd per zijde apart verwerkt. Als AI niets bruikbaars vindt, schakelt de app automatisch terug naar de gemiddelde inschatting per kozijn.
         </section>
       </div>
 
