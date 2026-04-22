@@ -1,127 +1,128 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { z } from "zod";
-import { zodTextFormat } from "openai/helpers/zod";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const OpeningSchema = z.object({
+  id: z.string(),
+  type: z.enum(["window", "door", "other"]),
+  width: z.string(),
+  height: z.string(),
+  count: z.string(),
 });
 
-const DetectionSchema = z.object({
-  openings: z.array(
-    z.object({
-      type: z.enum(["window", "door", "other"]),
-      widthEstimateCm: z.number(),
-      heightEstimateCm: z.number(),
-      count: z.number().int().min(1),
-      confidence: z.number().min(0).max(1),
-      reasoningShort: z.string(),
-    })
-  ),
-  facadeVisible: z.boolean(),
-  imageQuality: z.enum(["poor", "fair", "good"]),
-  notes: z.array(z.string()),
+const SideSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  width: z.string(),
+  height: z.string(),
+  openingMode: z.enum(["none", "ai", "manual", "skip"]),
+  aiDetectedCount: z.number().nullable().optional(),
+  openings: z.array(OpeningSchema),
 });
 
-function fileToDataUrl(file: File, mimeType: string, buffer: Buffer) {
-  return `data:${mimeType};base64,${buffer.toString("base64")}`;
+const PayloadSchema = z.array(SideSchema);
+
+function toNumber(value: string) {
+  const parsed = Number(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function toPositiveNumber(value: FormDataEntryValue | null) {
-  if (typeof value !== "string") return null;
-  const parsed = Number(value.replace(",", "."));
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return parsed;
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: "OPENAI_API_KEY ontbreekt in .env.local." },
-        { status: 500 }
-      );
-    }
-
     const formData = await req.formData();
-    const image = formData.get("image");
-    const sideWidthCm = toPositiveNumber(formData.get("sideWidthCm"));
-    const sideHeightCm = toPositiveNumber(formData.get("sideHeightCm"));
-    const sideName =
-      typeof formData.get("sideName") === "string"
-        ? String(formData.get("sideName"))
-        : "Zijde";
+    const rawSides = formData.get("sides");
 
-    if (!(image instanceof File)) {
+    if (typeof rawSides !== "string") {
       return NextResponse.json(
-        { error: "Geen afbeelding ontvangen." },
+        { error: "Sides payload ontbreekt." },
         { status: 400 }
       );
     }
 
-    if (!sideWidthCm || !sideHeightCm) {
-      return NextResponse.json(
-        { error: "Breedte en hoogte van de zijde zijn verplicht." },
-        { status: 400 }
-      );
-    }
+    const parsedJson = JSON.parse(rawSides);
+    const sides = PayloadSchema.parse(parsedJson);
 
-    const arrayBuffer = await image.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const mimeType = image.type || "image/jpeg";
-    const dataUrl = fileToDataUrl(image, mimeType, buffer);
+    const result = sides.map((side) => {
+      const sideWidthCm = toNumber(side.width);
+      const sideHeightCm = toNumber(side.height);
 
-    const prompt = [
-      `Analyseer deze gevelafbeelding voor ${sideName}.`,
-      `De echte breedte van deze zijde is ${sideWidthCm} cm.`,
-      `De echte hoogte van deze zijde is ${sideHeightCm} cm.`,
-      `Gebruik deze afmetingen als schaalreferentie voor een best-effort schatting.`,
-      `Detecteer zichtbare openingen zoals ramen, deuren of overige openingen.`,
-      `Combineer identieke openingen waar logisch, en geef count > 1 als ze duidelijk hetzelfde formaat hebben.`,
-      `Als de foto scheef, onvolledig of onduidelijk is, geef dat aan in notes en confidence.`,
-      `Geef alleen openingen terug die echt zichtbaar of sterk aannemelijk zijn.`,
-      `Als er geen openingen zichtbaar zijn, geef openings: [].`,
-      `De output moet JSON zijn conform het schema.`,
-    ].join(" ");
+      const grossAreaM2 = (sideWidthCm / 100) * (sideHeightCm / 100);
 
-    const response = await openai.responses.parse({
-      model: "gpt-4o-2024-08-06",
-      input: [
-        {
-          role: "system",
-          content:
-            "Je bent een nauwkeurige bouwkundige vision-extractor. Je schat openingen op een gevel op basis van een foto en opgegeven werkelijke gevelmaat. Je overschat niet. Je mag onzekerheid benoemen.",
-        },
-        {
-          role: "user",
-          content: [
-            { type: "input_text", text: prompt },
-            {
-              type: "input_image",
-              image_url: dataUrl,
-            },
-          ],
-        },
-      ],
-      text: {
-        format: zodTextFormat(DetectionSchema, "facade_opening_detection"),
-      },
+      let openingAreaM2 = 0;
+      let openingCount = 0;
+
+      if (side.openingMode === "manual" || side.openingMode === "ai") {
+        for (const opening of side.openings) {
+          const widthCm = toNumber(opening.width);
+          const heightCm = toNumber(opening.height);
+          const count = Math.max(0, Math.floor(toNumber(opening.count)));
+
+          const areaM2 = (widthCm / 100) * (heightCm / 100) * count;
+          openingAreaM2 += areaM2;
+          openingCount += count;
+        }
+      }
+
+      if (side.openingMode === "none") {
+        openingAreaM2 = 0;
+        openingCount = 0;
+      }
+
+      if (side.openingMode === "skip") {
+        return {
+          id: side.id,
+          name: side.name,
+          skipped: true,
+          grossAreaM2: 0,
+          openingAreaM2: 0,
+          netAreaM2: 0,
+          openingCount: 0,
+        };
+      }
+
+      const netAreaM2 = Math.max(0, grossAreaM2 - openingAreaM2);
+
+      return {
+        id: side.id,
+        name: side.name,
+        skipped: false,
+        grossAreaM2: round2(grossAreaM2),
+        openingAreaM2: round2(openingAreaM2),
+        netAreaM2: round2(netAreaM2),
+        openingCount,
+        openingMode: side.openingMode,
+      };
     });
 
-    const parsed = response.output_parsed;
+    const includedSides = result.filter((side) => !side.skipped);
 
-    if (!parsed) {
-      return NextResponse.json(
-        { error: "AI gaf geen bruikbare output terug." },
-        { status: 502 }
-      );
-    }
+    const totals = {
+      grossAreaM2: round2(
+        includedSides.reduce((sum, side) => sum + side.grossAreaM2, 0)
+      ),
+      openingAreaM2: round2(
+        includedSides.reduce((sum, side) => sum + side.openingAreaM2, 0)
+      ),
+      netAreaM2: round2(
+        includedSides.reduce((sum, side) => sum + side.netAreaM2, 0)
+      ),
+      openingCount: includedSides.reduce((sum, side) => sum + side.openingCount, 0),
+      sideCountIncluded: includedSides.length,
+      sideCountSkipped: result.filter((side) => side.skipped).length,
+    };
 
-    return NextResponse.json(parsed);
+    return NextResponse.json({
+      success: true,
+      sides: result,
+      totals,
+    });
   } catch (error) {
-    console.error("estimate-openings error", error);
+    console.error("visualize error", error);
     return NextResponse.json(
-      { error: "AI-inschatting mislukt." },
+      { error: "Visualisatieverwerking mislukt." },
       { status: 500 }
     );
   }

@@ -1,31 +1,11 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { z } from "zod";
-import { zodTextFormat } from "openai/helpers/zod";
 
-const openai = new OpenAI({
+export const runtime = "nodejs";
+
+const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-const DetectionSchema = z.object({
-  openings: z.array(
-    z.object({
-      type: z.enum(["window", "door", "other"]),
-      widthEstimateCm: z.number(),
-      heightEstimateCm: z.number(),
-      count: z.number().int().min(1),
-      confidence: z.number().min(0).max(1),
-      reasoningShort: z.string(),
-    })
-  ),
-  facadeVisible: z.boolean(),
-  imageQuality: z.enum(["poor", "fair", "good"]),
-  notes: z.array(z.string()),
-});
-
-function fileToDataUrl(file: File, mimeType: string, buffer: Buffer) {
-  return `data:${mimeType};base64,${buffer.toString("base64")}`;
-}
 
 function toPositiveNumber(value: FormDataEntryValue | null) {
   if (typeof value !== "string") return null;
@@ -34,16 +14,21 @@ function toPositiveNumber(value: FormDataEntryValue | null) {
   return parsed;
 }
 
+function buildDataUrl(mimeType: string, base64: string) {
+  return `data:${mimeType};base64,${base64}`;
+}
+
 export async function POST(req: Request) {
   try {
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        { error: "OPENAI_API_KEY ontbreekt in .env.local." },
+        { error: "OPENAI_API_KEY ontbreekt." },
         { status: 500 }
       );
     }
 
     const formData = await req.formData();
+
     const image = formData.get("image");
     const sideWidthCm = toPositiveNumber(formData.get("sideWidthCm"));
     const sideHeightCm = toPositiveNumber(formData.get("sideHeightCm"));
@@ -61,67 +46,120 @@ export async function POST(req: Request) {
 
     if (!sideWidthCm || !sideHeightCm) {
       return NextResponse.json(
-        { error: "Breedte en hoogte van de zijde zijn verplicht." },
+        { error: "Breedte en hoogte zijn verplicht." },
         { status: 400 }
       );
     }
 
-    const arrayBuffer = await image.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const bytes = Buffer.from(await image.arrayBuffer());
     const mimeType = image.type || "image/jpeg";
-    const dataUrl = fileToDataUrl(image, mimeType, buffer);
+    const dataUrl = buildDataUrl(mimeType, bytes.toString("base64"));
 
-    const prompt = [
-      `Analyseer deze gevelafbeelding voor ${sideName}.`,
-      `De echte breedte van deze zijde is ${sideWidthCm} cm.`,
-      `De echte hoogte van deze zijde is ${sideHeightCm} cm.`,
-      `Gebruik deze afmetingen als schaalreferentie voor een best-effort schatting.`,
-      `Detecteer zichtbare openingen zoals ramen, deuren of overige openingen.`,
-      `Combineer identieke openingen waar logisch, en geef count > 1 als ze duidelijk hetzelfde formaat hebben.`,
-      `Als de foto scheef, onvolledig of onduidelijk is, geef dat aan in notes en confidence.`,
-      `Geef alleen openingen terug die echt zichtbaar of sterk aannemelijk zijn.`,
-      `Als er geen openingen zichtbaar zijn, geef openings: [].`,
-      `De output moet JSON zijn conform het schema.`,
-    ].join(" ");
-
-    const response = await openai.responses.parse({
+    const response = await client.responses.create({
       model: "gpt-4o-2024-08-06",
       input: [
         {
           role: "system",
-          content:
-            "Je bent een nauwkeurige bouwkundige vision-extractor. Je schat openingen op een gevel op basis van een foto en opgegeven werkelijke gevelmaat. Je overschat niet. Je mag onzekerheid benoemen.",
+          content: [
+            {
+              type: "input_text",
+              text:
+                "Je bent een nauwkeurige bouwkundige vision-extractor. " +
+                "Je detecteert ramen, deuren en andere openingen in gevels. " +
+                "Gebruik opgegeven afmetingen als schaal. " +
+                "Wees conservatief en geef onzekerheid aan.",
+            },
+          ],
         },
         {
           role: "user",
           content: [
-            { type: "input_text", text: prompt },
+            {
+              type: "input_text",
+              text:
+                `Analyseer deze gevelafbeelding voor ${sideName}. ` +
+                `De echte breedte is ${sideWidthCm} cm. ` +
+                `De echte hoogte is ${sideHeightCm} cm. ` +
+                `Gebruik dit als schaal. ` +
+                `Detecteer openingen (ramen, deuren). ` +
+                `Combineer gelijke openingen met count. ` +
+                `Als niets zichtbaar is → geef lege array.`,
+            },
             {
               type: "input_image",
               image_url: dataUrl,
+              detail: "auto", // 🔥 FIX VOOR JOUW ERROR
             },
           ],
         },
       ],
       text: {
-        format: zodTextFormat(DetectionSchema, "facade_opening_detection"),
+        format: {
+          type: "json_schema",
+          name: "facade_openings",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              openings: {
+                type: "array",
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    type: {
+                      type: "string",
+                      enum: ["window", "door", "other"],
+                    },
+                    widthEstimateCm: { type: "number" },
+                    heightEstimateCm: { type: "number" },
+                    count: { type: "integer" },
+                    confidence: { type: "number" },
+                    reasoningShort: { type: "string" },
+                  },
+                  required: [
+                    "type",
+                    "widthEstimateCm",
+                    "heightEstimateCm",
+                    "count",
+                    "confidence",
+                    "reasoningShort",
+                  ],
+                },
+              },
+              facadeVisible: { type: "boolean" },
+              imageQuality: {
+                type: "string",
+                enum: ["poor", "fair", "good"],
+              },
+              notes: {
+                type: "array",
+                items: { type: "string" },
+              },
+            },
+            required: ["openings", "facadeVisible", "imageQuality", "notes"],
+          },
+        },
       },
     });
 
-    const parsed = response.output_parsed;
+    const raw = response.output_text;
 
-    if (!parsed) {
+    if (!raw) {
       return NextResponse.json(
-        { error: "AI gaf geen bruikbare output terug." },
+        { error: "Geen output van AI." },
         { status: 502 }
       );
     }
 
+    const parsed = JSON.parse(raw);
+
     return NextResponse.json(parsed);
   } catch (error) {
-    console.error("estimate-openings error", error);
+    console.error("AI error:", error);
     return NextResponse.json(
-      { error: "AI-inschatting mislukt." },
+      { error: "AI analyse mislukt." },
       { status: 500 }
     );
   }
