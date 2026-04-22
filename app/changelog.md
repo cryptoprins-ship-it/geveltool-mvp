@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6
+- Mobiele layout aangepast: alles staat nu onder elkaar
+- Stap 1, stap 2 en visualisatie verticaal geplaatst voor beter gebruik op telefoon
+- Knoppen groter gemaakt voor duimvriendelijk gebruik
+- Uploadflow op mobiel verbeterd
+- Materiaal- en navigatieflow duidelijker gemaakt op kleine schermen
+
 ## v0.5
 - Tweestaps flow toegevoegd: eerst oppervlakteberekening, daarna materiaalberekening
 - Knop toegevoegd om direct naar materiaalberekening te gaan

@@ -60,11 +60,10 @@ const translations: Record<Language, Record<string, string>> = {
     photoFormats: 'Ondersteund: JPG, PNG, WEBP en vaak HEIC – max 10 MB',
     invalidFile: 'Ongeldig bestand. Gebruik JPG, PNG, WEBP of HEIC.',
     fileTooLarge: 'Bestand is te groot. Maximum is 10 MB.',
-    photoLoaded: 'Foto geladen',
 
     areaStep: 'Stap 1 – Oppervlakteberekening',
     materialStep: 'Stap 2 – Materiaalberekening',
-    visualisation: 'Visualisatie',
+    visualisation: 'Stap 3 – Visualisatie',
     goToMaterial: '➡️ Ga naar materiaalberekening',
     backToArea: '⬅️ Terug naar oppervlakteberekening',
 
@@ -99,7 +98,8 @@ const translations: Record<Language, Record<string, string>> = {
     boards: 'planken',
     liters: 'liter',
 
-    chooseMaterialFirst: 'Kies eerst een materiaal en vul de materiaalgegevens in om aantallen en kosten te berekenen.',
+    chooseMaterialFirst:
+      'Kies eerst een materiaal en vul de materiaalgegevens in om aantallen en kosten te berekenen.',
 
     plastic: 'Kunststof',
     hardwood: 'Hardhout',
@@ -139,11 +139,10 @@ const translations: Record<Language, Record<string, string>> = {
     photoFormats: 'Supported: JPG, PNG, WEBP and often HEIC – max 10 MB',
     invalidFile: 'Invalid file. Use JPG, PNG, WEBP or HEIC.',
     fileTooLarge: 'File is too large. Maximum is 10 MB.',
-    photoLoaded: 'Photo loaded',
 
     areaStep: 'Step 1 – Surface calculation',
     materialStep: 'Step 2 – Material calculation',
-    visualisation: 'Visualization',
+    visualisation: 'Step 3 – Visualization',
     goToMaterial: '➡️ Go to material calculation',
     backToArea: '⬅️ Back to surface calculation',
 
@@ -178,7 +177,8 @@ const translations: Record<Language, Record<string, string>> = {
     boards: 'boards',
     liters: 'liter',
 
-    chooseMaterialFirst: 'First choose a material and enter the material settings to calculate quantities and costs.',
+    chooseMaterialFirst:
+      'First choose a material and enter the material settings to calculate quantities and costs.',
 
     plastic: 'Plastic',
     hardwood: 'Hardwood',
@@ -432,10 +432,10 @@ export default function Page() {
     selectedVisual === 'plastic' ? plasticRef : selectedVisual === 'hardwood' ? woodRef : undefined;
 
   return (
-    <main style={{ minHeight: '100vh', background: '#f8fafc', padding: 24, fontFamily: 'Arial, sans-serif', color: '#000' }}>
-      <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-          <div style={{ minWidth: 180 }}>
+    <main style={{ minHeight: '100vh', background: '#f8fafc', padding: 16, fontFamily: 'Arial, sans-serif', color: '#000' }}>
+      <div style={{ maxWidth: 820, margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <div style={{ width: '100%', maxWidth: 180 }}>
             <label>{t.language}</label>
             <select value={language} onChange={(e) => setLanguage(e.target.value as Language)} style={inputStyle}>
               <option value="nl">Nederlands</option>
@@ -445,372 +445,379 @@ export default function Page() {
         </div>
 
         <div style={cardStyle}>
-          <h1 style={{ fontSize: 32, margin: 0 }}>{t.appTitle}</h1>
-          <p style={{ marginTop: 8, fontSize: 18, fontWeight: 600 }}>{t.subtitle}</p>
-          <p style={{ marginTop: 12 }}>{t.intro}</p>
+          <h1 style={{ fontSize: 28, margin: 0 }}>{t.appTitle}</h1>
+          <p style={{ marginTop: 8, fontSize: 16, fontWeight: 700 }}>{t.subtitle}</p>
+          <p style={{ marginTop: 10, lineHeight: 1.5 }}>{t.intro}</p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 24 }}>
-          <div>
-            <div id="oppervlakte" style={cardStyle}>
-              <h2>{t.areaStep}</h2>
+        <div id="oppervlakte" style={cardStyle}>
+          <h2 style={stepTitleStyle}>{t.areaStep}</h2>
 
-              {calculatedSides.map((side) => (
-                <div key={side.id} style={sectionStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          {calculatedSides.map((side) => (
+            <div key={side.id} style={sectionStyle}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                <input
+                  value={side.name}
+                  onChange={(e) => updateSide(side.id, { name: e.target.value })}
+                  style={{ ...inputStyle, marginTop: 0 }}
+                />
+
+                <div style={buttonGroupStyle}>
+                  <button onClick={() => runAiEstimate(side.id)} style={mobileButtonSecondary}>
+                    {t.aiEstimate}
+                  </button>
+                  <button onClick={() => duplicateSide(side.id)} style={mobileButtonSecondary}>
+                    {t.duplicateSide}
+                  </button>
+                  <button onClick={() => removeSide(side.id)} style={mobileButtonSecondary}>
+                    {t.remove}
+                  </button>
+                </div>
+              </div>
+
+              <div style={uploadCardStyle}>
+                <label>{t.sidePhoto}</label>
+                <div style={{ marginTop: 10 }}>
+                  <label style={{ display: 'block', cursor: 'pointer' }}>
+                    <span style={mobileButtonPrimary}>{side.image ? t.replacePhoto : t.choosePhoto}</span>
                     <input
-                      value={side.name}
-                      onChange={(e) => updateSide(side.id, { name: e.target.value })}
-                      style={{ ...inputStyle, minWidth: 180, marginTop: 0 }}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(e) => handleSideImage(side.id, e.target.files?.[0])}
+                      style={{ display: 'none' }}
                     />
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button onClick={() => runAiEstimate(side.id)} style={btnSecondary}>{t.aiEstimate}</button>
-                      <button onClick={() => duplicateSide(side.id)} style={btnSecondary}>{t.duplicateSide}</button>
-                      <button onClick={() => removeSide(side.id)} style={btnSecondary}>{t.remove}</button>
-                    </div>
+                  </label>
+                </div>
+
+                <div style={{ marginTop: 10, fontSize: 13 }}>
+                  {side.imageName ? `✅ ${side.imageName}` : t.noPhotoSelected}
+                </div>
+
+                <div style={{ marginTop: 6, fontSize: 12, color: '#334155' }}>{t.photoFormats}</div>
+
+                {side.imageError && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#b91c1c', fontWeight: 600 }}>
+                    {side.imageError}
                   </div>
+                )}
+              </div>
 
-                  <div style={uploadCardStyle}>
-                    <label>{t.sidePhoto}</label>
-                    <div style={{ marginTop: 10 }}>
-                      <label style={{ display: 'inline-block', cursor: 'pointer' }}>
-                        <span style={btnPrimary}>{side.image ? t.replacePhoto : t.choosePhoto}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          onChange={(e) => handleSideImage(side.id, e.target.files?.[0])}
-                          style={{ display: 'none' }}
-                        />
-                      </label>
-                    </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 14 }}>
+                <div>
+                  <label>{t.useSizeFrom}</label>
+                  <select
+                    value={side.linkToSide ?? ''}
+                    onChange={(e) =>
+                      updateSide(side.id, {
+                        linkToSide: e.target.value ? Number(e.target.value) : undefined,
+                      })
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="">{t.manualSize}</option>
+                    {sides
+                      .filter((s) => s.id !== side.id)
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
 
-                    <div style={{ marginTop: 10, fontSize: 13 }}>
-                      {side.imageName ? `✅ ${side.imageName}` : t.noPhotoSelected}
-                    </div>
+                <div>
+                  <label>{t.width}</label>
+                  <input
+                    value={side.linkToSide ? String(side.calculatedWidth) : side.width}
+                    onChange={(e) => updateSide(side.id, { width: e.target.value })}
+                    style={{
+                      ...inputStyle,
+                      background: side.linkToSide ? '#e2e8f0' : '#fff',
+                    }}
+                    disabled={!!side.linkToSide}
+                  />
+                </div>
 
-                    <div style={{ marginTop: 6, fontSize: 12, color: '#334155' }}>{t.photoFormats}</div>
+                <div>
+                  <label>{t.height}</label>
+                  <input
+                    value={side.linkToSide ? String(side.calculatedHeight) : side.height}
+                    onChange={(e) => updateSide(side.id, { height: e.target.value })}
+                    style={{
+                      ...inputStyle,
+                      background: side.linkToSide ? '#e2e8f0' : '#fff',
+                    }}
+                    disabled={!!side.linkToSide}
+                  />
+                </div>
 
-                    {side.imageError && (
-                      <div style={{ marginTop: 8, fontSize: 12, color: '#b91c1c', fontWeight: 600 }}>
-                        {side.imageError}
-                      </div>
+                <div>
+                  <label>{t.deductionMode}</label>
+                  <select
+                    value={side.deductionMode}
+                    onChange={(e) => updateSide(side.id, { deductionMode: e.target.value as 'manual' | 'ai' })}
+                    style={inputStyle}
+                  >
+                    <option value="manual">{t.manual}</option>
+                    <option value="ai">{t.automaticAi}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label>{side.deductionMode === 'ai' ? t.aiDeduction : t.manualDeduction}</label>
+                  <input
+                    value={side.deductionMode === 'ai' ? side.aiDeductionM2 : side.deductionM2}
+                    onChange={(e) =>
+                      updateSide(
+                        side.id,
+                        side.deductionMode === 'ai' ? { aiDeductionM2: e.target.value } : { deductionM2: e.target.value }
+                      )
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: 14, background: '#fff', borderRadius: 16, padding: 16, border: '1px solid #e2e8f0' }}>
+                <div style={{ fontWeight: 700, marginBottom: 10 }}>{t.result}</div>
+                <div style={rowStyle}><span>{t.gross}</span><span>{side.grossM2.toFixed(2)} m²</span></div>
+                <div style={rowStyle}><span>{t.deduction}</span><span>{side.safeDeduction.toFixed(2)} m²</span></div>
+                <div style={{ ...rowStyle, fontWeight: 700 }}><span>{t.net}</span><span>{side.netM2.toFixed(2)} m²</span></div>
+              </div>
+
+              {side.image && (
+                <div style={{ marginTop: 14, borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                  <div style={{ position: 'relative', aspectRatio: '16/10', background: '#cbd5e1' }}>
+                    <img
+                      src={side.image}
+                      alt={side.name}
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    {selectedVisual === 'paint' ? (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundColor: paintColor,
+                          opacity: overlayOpacity / 100,
+                          mixBlendMode: 'multiply',
+                        }}
+                      />
+                    ) : currentTexture ? (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundImage: `url(${currentTexture})`,
+                          backgroundSize: orientation === 'horizontal' ? 'auto 90px' : '90px auto',
+                          backgroundRepeat: 'repeat',
+                          opacity: overlayOpacity / 100,
+                          mixBlendMode: 'multiply',
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          opacity: 0.7,
+                          backgroundImage:
+                            orientation === 'horizontal'
+                              ? 'repeating-linear-gradient(0deg, rgba(90,75,60,.55) 0px, rgba(90,75,60,.55) 10px, rgba(155,130,110,.5) 10px, rgba(155,130,110,.5) 46px)'
+                              : 'repeating-linear-gradient(90deg, rgba(90,75,60,.55) 0px, rgba(90,75,60,.55) 10px, rgba(155,130,110,.5) 10px, rgba(155,130,110,.5) 46px)',
+                          mixBlendMode: 'multiply',
+                        }}
+                      />
                     )}
                   </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 16 }}>
-                    <div>
-                      <label>{t.useSizeFrom}</label>
-                      <select
-                        value={side.linkToSide ?? ''}
-                        onChange={(e) =>
-                          updateSide(side.id, {
-                            linkToSide: e.target.value ? Number(e.target.value) : undefined,
-                          })
-                        }
-                        style={inputStyle}
-                      >
-                        <option value="">{t.manualSize}</option>
-                        {sides
-                          .filter((s) => s.id !== side.id)
-                          .map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label>{t.width}</label>
-                      <input
-                        value={side.linkToSide ? String(side.calculatedWidth) : side.width}
-                        onChange={(e) => updateSide(side.id, { width: e.target.value })}
-                        style={{
-                          ...inputStyle,
-                          background: side.linkToSide ? '#e2e8f0' : '#fff',
-                        }}
-                        disabled={!!side.linkToSide}
-                      />
-                    </div>
-
-                    <div>
-                      <label>{t.height}</label>
-                      <input
-                        value={side.linkToSide ? String(side.calculatedHeight) : side.height}
-                        onChange={(e) => updateSide(side.id, { height: e.target.value })}
-                        style={{
-                          ...inputStyle,
-                          background: side.linkToSide ? '#e2e8f0' : '#fff',
-                        }}
-                        disabled={!!side.linkToSide}
-                      />
-                    </div>
-
-                    <div>
-                      <label>{t.deductionMode}</label>
-                      <select
-                        value={side.deductionMode}
-                        onChange={(e) => updateSide(side.id, { deductionMode: e.target.value as 'manual' | 'ai' })}
-                        style={inputStyle}
-                      >
-                        <option value="manual">{t.manual}</option>
-                        <option value="ai">{t.automaticAi}</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label>{side.deductionMode === 'ai' ? t.aiDeduction : t.manualDeduction}</label>
-                      <input
-                        value={side.deductionMode === 'ai' ? side.aiDeductionM2 : side.deductionM2}
-                        onChange={(e) =>
-                          updateSide(
-                            side.id,
-                            side.deductionMode === 'ai' ? { aiDeductionM2: e.target.value } : { deductionM2: e.target.value }
-                          )
-                        }
-                        style={inputStyle}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: 16, background: '#fff', borderRadius: 16, padding: 16, border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: 700, marginBottom: 10 }}>{t.result}</div>
-                    <div style={rowStyle}><span>{t.gross}</span><span>{side.grossM2.toFixed(2)} m²</span></div>
-                    <div style={rowStyle}><span>{t.deduction}</span><span>{side.safeDeduction.toFixed(2)} m²</span></div>
-                    <div style={{ ...rowStyle, fontWeight: 700 }}><span>{t.net}</span><span>{side.netM2.toFixed(2)} m²</span></div>
-                  </div>
-
-                  {side.image && (
-                    <div style={{ marginTop: 16, borderRadius: 16, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-                      <div style={{ position: 'relative', aspectRatio: '16/9', background: '#cbd5e1' }}>
-                        <img
-                          src={side.image}
-                          alt={side.name}
-                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                        {selectedVisual === 'paint' ? (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              backgroundColor: paintColor,
-                              opacity: overlayOpacity / 100,
-                              mixBlendMode: 'multiply',
-                            }}
-                          />
-                        ) : currentTexture ? (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              backgroundImage: `url(${currentTexture})`,
-                              backgroundSize: orientation === 'horizontal' ? 'auto 90px' : '90px auto',
-                              backgroundRepeat: 'repeat',
-                              opacity: overlayOpacity / 100,
-                              mixBlendMode: 'multiply',
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              inset: 0,
-                              opacity: 0.7,
-                              backgroundImage:
-                                orientation === 'horizontal'
-                                  ? 'repeating-linear-gradient(0deg, rgba(90,75,60,.55) 0px, rgba(90,75,60,.55) 10px, rgba(155,130,110,.5) 10px, rgba(155,130,110,.5) 46px)'
-                                  : 'repeating-linear-gradient(90deg, rgba(90,75,60,.55) 0px, rgba(90,75,60,.55) 10px, rgba(155,130,110,.5) 10px, rgba(155,130,110,.5) 46px)',
-                              mixBlendMode: 'multiply',
-                            }}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              ))}
+              )}
+            </div>
+          ))}
 
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <button onClick={addSide} style={btnPrimary}>{t.addSide}</button>
-                <button
-                  onClick={() => {
-                    document.getElementById('materiaal')?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  style={{ ...btnPrimary, background: '#2563eb' }}
-                >
-                  {t.goToMaterial}
-                </button>
+          <div style={buttonStackStyle}>
+            <button onClick={addSide} style={mobileButtonPrimary}>{t.addSide}</button>
+            <button
+              onClick={() => {
+                document.getElementById('materiaal')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              style={{ ...mobileButtonPrimary, background: '#2563eb' }}
+            >
+              {t.goToMaterial}
+            </button>
+          </div>
+
+          <div style={{ ...sectionStyle, marginTop: 20 }}>
+            <div style={{ fontWeight: 700, marginBottom: 12 }}>{t.result}</div>
+            <div style={rowStyle}><span>{t.totalGross}</span><span>{areaTotals.grossM2.toFixed(2)} m²</span></div>
+            <div style={rowStyle}><span>{t.totalDeduction}</span><span>{areaTotals.deductionM2.toFixed(2)} m²</span></div>
+            <div style={{ ...rowStyle, fontWeight: 700 }}><span>{t.totalNet}</span><span>{areaTotals.netM2.toFixed(2)} m²</span></div>
+          </div>
+        </div>
+
+        <div id="materiaal" style={cardStyle}>
+          <h2 style={stepTitleStyle}>{t.materialStep}</h2>
+
+          <button
+            onClick={() => {
+              document.getElementById('oppervlakte')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            style={{ ...mobileButtonSecondary, marginBottom: 16 }}
+          >
+            {t.backToArea}
+          </button>
+
+          <div>
+            <label>{t.solution}</label>
+            <select value={material} onChange={(e) => updateMaterial(e.target.value as MaterialType | '')} style={inputStyle}>
+              <option value="">{t.chooseSolution}</option>
+              <option value="plastic">{t.plasticBoards}</option>
+              <option value="hardwood">{t.hardwoodBoards}</option>
+              <option value="paint">{t.paint}</option>
+            </select>
+          </div>
+
+          {!material ? (
+            <div style={{ ...sectionStyle, marginTop: 16 }}>
+              {t.chooseMaterialFirst}
+            </div>
+          ) : (
+            <>
+              {material === 'paint' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 16 }}>
+                  <div>
+                    <label>{t.layers}</label>
+                    <input value={layers} onChange={(e) => setLayers(e.target.value)} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label>{t.coverage}</label>
+                    <input value={unitSize} onChange={(e) => setUnitSize(e.target.value)} style={inputStyle} />
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 16 }}>
+                  <div>
+                    <label>{t.boardHeight}</label>
+                    <input value={plankHeightMm} onChange={(e) => setPlankHeightMm(e.target.value)} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label>{t.boardLength}</label>
+                    <input value={unitSize} onChange={(e) => setUnitSize(e.target.value)} style={inputStyle} />
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 12 }}>
+                <div>
+                  <label>{material === 'paint' ? t.pricePerLiter : t.pricePerBoard}</label>
+                  <input value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} style={inputStyle} />
+                </div>
+                <div>
+                  <label>{t.waste}</label>
+                  <input value={wastePercent} onChange={(e) => setWastePercent(e.target.value)} style={inputStyle} />
+                </div>
               </div>
 
-              <div style={{ ...sectionStyle, marginTop: 24 }}>
-                <div style={{ fontWeight: 700, marginBottom: 12 }}>{t.result}</div>
-                <div style={rowStyle}><span>{t.totalGross}</span><span>{areaTotals.grossM2.toFixed(2)} m²</span></div>
-                <div style={rowStyle}><span>{t.totalDeduction}</span><span>{areaTotals.deductionM2.toFixed(2)} m²</span></div>
-                <div style={{ ...rowStyle, fontWeight: 700 }}><span>{t.totalNet}</span><span>{areaTotals.netM2.toFixed(2)} m²</span></div>
+              <div style={{ marginTop: 12 }}>
+                <label>{t.discount}</label>
+                <input value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)} style={inputStyle} />
+              </div>
+
+              {materialResult && (
+                <div style={{ ...sectionStyle, marginTop: 16 }}>
+                  {material !== 'paint' && (
+                    <div style={rowStyle}><span>{t.totalRows}</span><span>{materialResult.rows}</span></div>
+                  )}
+                  <div style={rowStyle}><span>{t.needed}</span><span>{materialResult.quantity.toFixed(1)} {materialResult.quantityLabel}</span></div>
+                  <div style={{ ...rowStyle, fontWeight: 700, fontSize: 18 }}>
+                    <span>{t.estimatedCost}</span>
+                    <span>€ {materialResult.totalPrice.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div style={cardStyle}>
+          <h2 style={stepTitleStyle}>{t.visualisation}</h2>
+
+          <div style={buttonGroupStyle}>
+            <button onClick={() => setSelectedVisual('plastic')} style={selectedVisual === 'plastic' ? mobileButtonPrimary : mobileButtonSecondary}>
+              {t.plastic}
+            </button>
+            <button onClick={() => setSelectedVisual('hardwood')} style={selectedVisual === 'hardwood' ? mobileButtonPrimary : mobileButtonSecondary}>
+              {t.hardwood}
+            </button>
+            <button onClick={() => setSelectedVisual('paint')} style={selectedVisual === 'paint' ? mobileButtonPrimary : mobileButtonSecondary}>
+              {t.paintLabel}
+            </button>
+          </div>
+
+          {selectedVisual === 'plastic' && (
+            <div style={uploadCardStyle}>
+              <label>{t.plasticRef}</label>
+              <div style={{ marginTop: 10 }}>
+                <label style={{ display: 'block', cursor: 'pointer' }}>
+                  <span style={mobileButtonPrimary}>{t.choosePhoto}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => handleReferenceImage(e.target.files?.[0], 'plastic')}
+                    style={{ display: 'none' }}
+                  />
+                </label>
               </div>
             </div>
+          )}
+
+          {selectedVisual === 'hardwood' && (
+            <div style={uploadCardStyle}>
+              <label>{t.hardwoodRef}</label>
+              <div style={{ marginTop: 10 }}>
+                <label style={{ display: 'block', cursor: 'pointer' }}>
+                  <span style={mobileButtonPrimary}>{t.choosePhoto}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => handleReferenceImage(e.target.files?.[0], 'wood')}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+
+          {selectedVisual === 'paint' && (
+            <div style={{ marginBottom: 16 }}>
+              <label>{t.paintColor}</label>
+              <div style={{ marginTop: 8 }}>
+                <input type="color" value={paintColor} onChange={(e) => setPaintColor(e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginBottom: 16 }}>
+            <label>{t.overlay}: {overlayOpacity}%</label>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={overlayOpacity}
+              onChange={(e) => setOverlayOpacity(Number(e.target.value))}
+              style={{ width: '100%', marginTop: 8 }}
+            />
           </div>
 
           <div>
-            <div id="materiaal" style={cardStyle}>
-              <h2>{t.materialStep}</h2>
-
-              <button
-                onClick={() => {
-                  document.getElementById('oppervlakte')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                style={{ ...btnSecondary, marginBottom: 16, width: '100%' }}
-              >
-                {t.backToArea}
-              </button>
-
-              <div>
-                <label>{t.solution}</label>
-                <select value={material} onChange={(e) => updateMaterial(e.target.value as MaterialType | '')} style={inputStyle}>
-                  <option value="">{t.chooseSolution}</option>
-                  <option value="plastic">{t.plasticBoards}</option>
-                  <option value="hardwood">{t.hardwoodBoards}</option>
-                  <option value="paint">{t.paint}</option>
-                </select>
-              </div>
-
-              {!material ? (
-                <div style={{ ...sectionStyle, marginTop: 16 }}>
-                  {t.chooseMaterialFirst}
-                </div>
-              ) : (
-                <>
-                  {material === 'paint' ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
-                      <div>
-                        <label>{t.layers}</label>
-                        <input value={layers} onChange={(e) => setLayers(e.target.value)} style={inputStyle} />
-                      </div>
-                      <div>
-                        <label>{t.coverage}</label>
-                        <input value={unitSize} onChange={(e) => setUnitSize(e.target.value)} style={inputStyle} />
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
-                      <div>
-                        <label>{t.boardHeight}</label>
-                        <input value={plankHeightMm} onChange={(e) => setPlankHeightMm(e.target.value)} style={inputStyle} />
-                      </div>
-                      <div>
-                        <label>{t.boardLength}</label>
-                        <input value={unitSize} onChange={(e) => setUnitSize(e.target.value)} style={inputStyle} />
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-                    <div>
-                      <label>{material === 'paint' ? t.pricePerLiter : t.pricePerBoard}</label>
-                      <input value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} style={inputStyle} />
-                    </div>
-                    <div>
-                      <label>{t.waste}</label>
-                      <input value={wastePercent} onChange={(e) => setWastePercent(e.target.value)} style={inputStyle} />
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: 12 }}>
-                    <label>{t.discount}</label>
-                    <input value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)} style={inputStyle} />
-                  </div>
-
-                  {materialResult && (
-                    <div style={{ ...sectionStyle, marginTop: 16 }}>
-                      {material !== 'paint' && (
-                        <div style={rowStyle}><span>{t.totalRows}</span><span>{materialResult.rows}</span></div>
-                      )}
-                      <div style={rowStyle}><span>{t.needed}</span><span>{materialResult.quantity.toFixed(1)} {materialResult.quantityLabel}</span></div>
-                      <div style={{ ...rowStyle, fontWeight: 700, fontSize: 18 }}>
-                        <span>{t.estimatedCost}</span>
-                        <span>€ {materialResult.totalPrice.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div style={cardStyle}>
-              <h2>{t.visualisation}</h2>
-
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                <button onClick={() => setSelectedVisual('plastic')} style={selectedVisual === 'plastic' ? btnPrimary : btnSecondary}>{t.plastic}</button>
-                <button onClick={() => setSelectedVisual('hardwood')} style={selectedVisual === 'hardwood' ? btnPrimary : btnSecondary}>{t.hardwood}</button>
-                <button onClick={() => setSelectedVisual('paint')} style={selectedVisual === 'paint' ? btnPrimary : btnSecondary}>{t.paintLabel}</button>
-              </div>
-
-              {selectedVisual === 'plastic' && (
-                <div style={uploadCardStyle}>
-                  <label>{t.plasticRef}</label>
-                  <div style={{ marginTop: 10 }}>
-                    <label style={{ display: 'inline-block', cursor: 'pointer' }}>
-                      <span style={btnPrimary}>{t.choosePhoto}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={(e) => handleReferenceImage(e.target.files?.[0], 'plastic')}
-                        style={{ display: 'none' }}
-                      />
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              {selectedVisual === 'hardwood' && (
-                <div style={uploadCardStyle}>
-                  <label>{t.hardwoodRef}</label>
-                  <div style={{ marginTop: 10 }}>
-                    <label style={{ display: 'inline-block', cursor: 'pointer' }}>
-                      <span style={btnPrimary}>{t.choosePhoto}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={(e) => handleReferenceImage(e.target.files?.[0], 'wood')}
-                        style={{ display: 'none' }}
-                      />
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              {selectedVisual === 'paint' && (
-                <div style={{ marginBottom: 16 }}>
-                  <label>{t.paintColor}</label>
-                  <div style={{ marginTop: 6 }}>
-                    <input type="color" value={paintColor} onChange={(e) => setPaintColor(e.target.value)} />
-                  </div>
-                </div>
-              )}
-
-              <div style={{ marginBottom: 16 }}>
-                <label>{t.overlay}: {overlayOpacity}%</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={overlayOpacity}
-                  onChange={(e) => setOverlayOpacity(Number(e.target.value))}
-                  style={{ width: '100%' }}
-                />
-              </div>
-
-              <div>
-                <label>{t.direction}</label>
-                <select value={orientation} onChange={(e) => setOrientation(e.target.value as 'horizontal' | 'vertical')} style={inputStyle}>
-                  <option value="horizontal">{t.horizontal}</option>
-                  <option value="vertical">{t.vertical}</option>
-                </select>
-              </div>
-            </div>
+            <label>{t.direction}</label>
+            <select value={orientation} onChange={(e) => setOrientation(e.target.value as 'horizontal' | 'vertical')} style={inputStyle}>
+              <option value="horizontal">{t.horizontal}</option>
+              <option value="vertical">{t.vertical}</option>
+            </select>
           </div>
         </div>
       </div>
@@ -820,52 +827,63 @@ export default function Page() {
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  padding: '10px 12px',
+  minHeight: 46,
+  padding: '12px 14px',
   borderRadius: 12,
   border: '1px solid #cbd5e1',
   marginTop: 6,
   boxSizing: 'border-box',
   color: '#000',
+  fontSize: 16,
 };
 
-const btnPrimary: React.CSSProperties = {
-  padding: '10px 14px',
+const mobileButtonPrimary: React.CSSProperties = {
+  width: '100%',
+  minHeight: 46,
+  padding: '12px 14px',
   borderRadius: 12,
   border: 'none',
   background: '#0f172a',
   color: '#fff',
   cursor: 'pointer',
+  fontSize: 15,
+  fontWeight: 700,
 };
 
-const btnSecondary: React.CSSProperties = {
-  padding: '10px 14px',
+const mobileButtonSecondary: React.CSSProperties = {
+  width: '100%',
+  minHeight: 46,
+  padding: '12px 14px',
   borderRadius: 12,
   border: '1px solid #cbd5e1',
   background: '#fff',
   color: '#0f172a',
   cursor: 'pointer',
+  fontSize: 15,
+  fontWeight: 700,
 };
 
 const rowStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
+  gap: 12,
   marginBottom: 8,
 };
 
 const cardStyle: React.CSSProperties = {
   background: '#fff',
-  borderRadius: 24,
-  padding: 24,
+  borderRadius: 20,
+  padding: 16,
   boxShadow: '0 1px 4px rgba(0,0,0,.08)',
-  marginBottom: 24,
+  marginBottom: 16,
 };
 
 const sectionStyle: React.CSSProperties = {
   background: '#f8fafc',
   border: '1px solid #e2e8f0',
   borderRadius: 18,
-  padding: 16,
-  marginBottom: 16,
+  padding: 14,
+  marginBottom: 14,
 };
 
 const uploadCardStyle: React.CSSProperties = {
@@ -874,4 +892,22 @@ const uploadCardStyle: React.CSSProperties = {
   borderRadius: 16,
   border: '1px dashed #94a3b8',
   background: '#f8fafc',
+};
+
+const stepTitleStyle: React.CSSProperties = {
+  marginTop: 0,
+  marginBottom: 14,
+  fontSize: 22,
+};
+
+const buttonGroupStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr',
+  gap: 8,
+};
+
+const buttonStackStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr',
+  gap: 10,
 };
