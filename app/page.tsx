@@ -123,9 +123,7 @@ export default function Page() {
       const linked = getLinkedDimensions(side, sides);
       const widthValue = linked ? linked.width : side.width;
       const heightValue = linked ? linked.height : side.height;
-
-      const hasBaseDimensions =
-        widthValue.trim() !== "" && heightValue.trim() !== "";
+      const hasBaseDimensions = widthValue.trim() !== "" && heightValue.trim() !== "";
       if (!hasBaseDimensions) return false;
 
       if (side.openingMode === "skip" || side.openingMode === "none") return true;
@@ -370,6 +368,23 @@ export default function Page() {
     });
   };
 
+  const applyCommonPairs = () => {
+    setSides((prev) => {
+      const next = [...prev];
+      if (next.length >= 2) {
+        next[1] = { ...next[1], linkToSideId: next[0].id };
+      }
+      if (next.length >= 4) {
+        next[3] = { ...next[3], linkToSideId: next[2].id };
+      }
+      return next;
+    });
+  };
+
+  const clearAllLinks = () => {
+    setSides((prev) => prev.map((side) => ({ ...side, linkToSideId: undefined })));
+  };
+
   const getWidthValue = (side: Side) => {
     const linked = getLinkedDimensions(side, sides);
     return linked ? linked.width : side.width;
@@ -493,6 +508,33 @@ export default function Page() {
           </p>
         </section>
 
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-black">Slim invullen</h2>
+              <p className="text-sm text-gray-600">
+                Veel panden hebben gelijke zijdes. Gebruik de snelle koppeling voor voor/achter en links/rechts.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50"
+                onClick={applyCommonPairs}
+              >
+                Koppel veelvoorkomende gelijke zijdes
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50"
+                onClick={clearAllLinks}
+              >
+                Koppelingen wissen
+              </button>
+            </div>
+          </div>
+        </section>
+
         {sides.map((side) => {
           const linked = getLinkedDimensions(side, sides);
           const widthValue = getWidthValue(side);
@@ -545,9 +587,9 @@ export default function Page() {
                 </select>
 
                 {linked ? (
-                  <p className="mt-2 text-xs text-gray-500">
+                  <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
                     Afmetingen worden overgenomen van {linked.name}.
-                  </p>
+                  </div>
                 ) : null}
               </div>
 
@@ -748,8 +790,7 @@ export default function Page() {
 
                   {toNumber(side.frameCount) > 0 ? (
                     <div className="rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-700">
-                      Geschatte aftrek:{" "}
-                      <strong>{getEstimatedDeductionM2(side).toFixed(2)} m²</strong>
+                      Geschatte aftrek: <strong>{getEstimatedDeductionM2(side).toFixed(2)} m²</strong>
                     </div>
                   ) : null}
                 </div>
