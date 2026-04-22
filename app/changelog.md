@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.8
+- Uploadknop opgesplitst in Maak foto en Kies bestand
+- Camera opent niet meer standaard bij alle uploads
+- Instructietekst toegevoegd voor camera- en fototoegang op iPhone en Android
+- Upload UX gebruiksvriendelijker gemaakt op mobiel
+
+## v0.7
+- Mobiele flow verder vereenvoudigd
+- Foto staat nu bovenaan in stap 1
+- Dupliceerfunctie verwijderd
+- Aftrek standaard op gemiddelde 18% gezet
+- Handmatige aftrek blijft mogelijk
+- Gebruik afmeting van andere zijde behouden
+- Maximaal 10 zijdes ingesteld
+
 ## v0.6
 - Mobiele layout aangepast: alles staat nu onder elkaar
 - Stap 1, stap 2 en visualisatie verticaal geplaatst voor beter gebruik op telefoon

@@ -7,9 +7,8 @@ type Side = {
   name: string;
   width: string;
   height: string;
-  deductionMode: 'manual' | 'ai';
+  deductionMode: 'average' | 'manual';
   deductionM2: string;
-  aiDeductionM2: string;
   image?: string;
   imageName?: string;
   imageError?: string;
@@ -39,27 +38,34 @@ const translations: Record<Language, Record<string, string>> = {
     intro:
       'Bereken eerst je netto oppervlak. Kies daarna pas materiaal om aantallen en kosten te berekenen.',
     language: 'Taal',
+
     side: 'Zijde',
     addSide: '+ Voeg volgende zijde toe',
     remove: 'Verwijder',
-    duplicateSide: 'Dupliceer zijde',
-    useSizeFrom: 'Gebruik maat van',
+    maxSidesReached: 'Maximum van 10 zijdes bereikt.',
+    useSizeFrom: 'Gebruik afmeting van',
     manualSize: 'Handmatig',
-    aiEstimate: 'AI schatting',
+
     width: 'Breedte (m)',
     height: 'Hoogte (m)',
-    deductionMode: 'Aftrekmodus',
-    manual: 'Handmatig',
-    automaticAi: 'AI automatisch',
+
+    openings: 'Openingen (ramen/deuren)',
+    averageOpenings: 'Gemiddeld (18%)',
+    manualOpenings: 'Handmatig aanpassen',
     manualDeduction: 'Handmatige aftrek m²',
-    aiDeduction: 'AI aftrek m²',
+    averageHint: 'Gebaseerd op gemiddelde openingen. Pas aan indien nodig.',
+
     sidePhoto: 'Laad hier uw foto in',
-    choosePhoto: '📸 Maak of kies foto',
+    takePhoto: '📷 Maak foto',
+    chooseFile: '🗂 Kies bestand',
     replacePhoto: '🔁 Vervang foto',
     noPhotoSelected: 'Nog geen foto gekozen',
     photoFormats: 'Ondersteund: JPG, PNG, WEBP en vaak HEIC – max 10 MB',
     invalidFile: 'Ongeldig bestand. Gebruik JPG, PNG, WEBP of HEIC.',
     fileTooLarge: 'Bestand is te groot. Maximum is 10 MB.',
+    cameraHelpTitle: 'Werkt de camera niet?',
+    cameraHelpText:
+      'Geef camera- en fototoegang in de instellingen van uw telefoon. iPhone: Instellingen > browser/app > Camera en Foto’s. Android: Instellingen > Apps > browser/app > Machtigingen > Camera en Bestanden/Foto’s.',
 
     areaStep: 'Stap 1 – Oppervlakteberekening',
     materialStep: 'Stap 2 – Materiaalberekening',
@@ -118,27 +124,34 @@ const translations: Record<Language, Record<string, string>> = {
     intro:
       'First calculate your net surface. Only then choose material to calculate quantities and costs.',
     language: 'Language',
+
     side: 'Side',
     addSide: '+ Add next side',
     remove: 'Remove',
-    duplicateSide: 'Duplicate side',
-    useSizeFrom: 'Use size from',
+    maxSidesReached: 'Maximum of 10 sides reached.',
+    useSizeFrom: 'Use dimensions from',
     manualSize: 'Manual',
-    aiEstimate: 'AI estimate',
+
     width: 'Width (m)',
     height: 'Height (m)',
-    deductionMode: 'Deduction mode',
-    manual: 'Manual',
-    automaticAi: 'AI automatic',
+
+    openings: 'Openings (windows/doors)',
+    averageOpenings: 'Average (18%)',
+    manualOpenings: 'Adjust manually',
     manualDeduction: 'Manual deduction m²',
-    aiDeduction: 'AI deduction m²',
+    averageHint: 'Based on average openings. Adjust if needed.',
+
     sidePhoto: 'Upload your photo here',
-    choosePhoto: '📸 Take or choose photo',
+    takePhoto: '📷 Take photo',
+    chooseFile: '🗂 Choose file',
     replacePhoto: '🔁 Replace photo',
     noPhotoSelected: 'No photo selected yet',
     photoFormats: 'Supported: JPG, PNG, WEBP and often HEIC – max 10 MB',
     invalidFile: 'Invalid file. Use JPG, PNG, WEBP or HEIC.',
     fileTooLarge: 'File is too large. Maximum is 10 MB.',
+    cameraHelpTitle: 'Camera not working?',
+    cameraHelpText:
+      'Allow camera and photo access in your phone settings. iPhone: Settings > browser/app > Camera and Photos. Android: Settings > Apps > browser/app > Permissions > Camera and Files/Photos.',
 
     areaStep: 'Step 1 – Surface calculation',
     materialStep: 'Step 2 – Material calculation',
@@ -199,9 +212,8 @@ function createSide(id: number, t: Record<string, string>): Side {
     name: `${t.side} ${id}`,
     width: '',
     height: '',
-    deductionMode: 'manual',
-    deductionM2: '0',
-    aiDeductionM2: '0',
+    deductionMode: 'average',
+    deductionM2: '',
     image: undefined,
     imageName: '',
     imageError: '',
@@ -228,33 +240,16 @@ export default function Page() {
   const [plasticRef, setPlasticRef] = useState<string | undefined>();
   const [woodRef, setWoodRef] = useState<string | undefined>();
   const [paintColor, setPaintColor] = useState('#d9d4ca');
+  const [maxSidesMessage, setMaxSidesMessage] = useState('');
 
   function addSide() {
-    setSides((prev) => [...prev, createSide(prev.length + 1, t)]);
-  }
-
-  function duplicateSide(id: number) {
     setSides((prev) => {
-      const source = prev.find((s) => s.id === id);
-      if (!source) return prev;
-
-      const newId = prev.length > 0 ? Math.max(...prev.map((s) => s.id)) + 1 : 1;
-
-      const clone: Side = {
-        id: newId,
-        name: `${t.side} ${newId}`,
-        width: source.width,
-        height: source.height,
-        deductionMode: source.deductionMode,
-        deductionM2: source.deductionM2,
-        aiDeductionM2: source.aiDeductionM2,
-        image: undefined,
-        imageName: '',
-        imageError: '',
-        linkToSide: source.linkToSide,
-      };
-
-      return [...prev, clone];
+      if (prev.length >= 10) {
+        setMaxSidesMessage(t.maxSidesReached);
+        return prev;
+      }
+      setMaxSidesMessage('');
+      return [...prev, createSide(prev.length + 1, t)];
     });
   }
 
@@ -333,14 +328,6 @@ export default function Page() {
     }
   }
 
-  function runAiEstimate(id: number) {
-    const side = sides.find((s) => s.id === id);
-    if (!side) return;
-    const gross = toNum(side.width) * toNum(side.height);
-    const estimate = gross > 0 ? Math.max(0, Math.round(gross * 0.18 * 10) / 10) : 0;
-    updateSide(id, { aiDeductionM2: String(estimate), deductionMode: 'ai' });
-  }
-
   function rowsForSide(heightValue: string | number, plankHeightM: number) {
     const h = toNum(heightValue);
     if (h <= 0) return 0;
@@ -361,11 +348,22 @@ export default function Page() {
       }
 
       const grossM2 = width * height;
-      const deduction = side.deductionMode === 'ai' ? toNum(side.aiDeductionM2) : toNum(side.deductionM2);
+      const deduction =
+        side.deductionMode === 'manual'
+          ? toNum(side.deductionM2)
+          : grossM2 * 0.18;
+
       const safeDeduction = Math.min(grossM2, Math.max(0, deduction));
       const netM2 = Math.max(0, grossM2 - safeDeduction);
 
-      return { ...side, calculatedWidth: width, calculatedHeight: height, grossM2, safeDeduction, netM2 };
+      return {
+        ...side,
+        calculatedWidth: width,
+        calculatedHeight: height,
+        grossM2,
+        safeDeduction,
+        netM2,
+      };
     });
   }, [sides]);
 
@@ -463,12 +461,6 @@ export default function Page() {
                 />
 
                 <div style={buttonGroupStyle}>
-                  <button onClick={() => runAiEstimate(side.id)} style={mobileButtonSecondary}>
-                    {t.aiEstimate}
-                  </button>
-                  <button onClick={() => duplicateSide(side.id)} style={mobileButtonSecondary}>
-                    {t.duplicateSide}
-                  </button>
                   <button onClick={() => removeSide(side.id)} style={mobileButtonSecondary}>
                     {t.remove}
                   </button>
@@ -477,13 +469,24 @@ export default function Page() {
 
               <div style={uploadCardStyle}>
                 <label>{t.sidePhoto}</label>
-                <div style={{ marginTop: 10 }}>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, marginTop: 10 }}>
                   <label style={{ display: 'block', cursor: 'pointer' }}>
-                    <span style={mobileButtonPrimary}>{side.image ? t.replacePhoto : t.choosePhoto}</span>
+                    <span style={mobileButtonPrimary}>{t.takePhoto}</span>
                     <input
                       type="file"
                       accept="image/*"
                       capture="environment"
+                      onChange={(e) => handleSideImage(side.id, e.target.files?.[0])}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+
+                  <label style={{ display: 'block', cursor: 'pointer' }}>
+                    <span style={mobileButtonSecondary}>{t.chooseFile}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
                       onChange={(e) => handleSideImage(side.id, e.target.files?.[0])}
                       style={{ display: 'none' }}
                     />
@@ -496,6 +499,11 @@ export default function Page() {
 
                 <div style={{ marginTop: 6, fontSize: 12, color: '#334155' }}>{t.photoFormats}</div>
 
+                <div style={{ marginTop: 8, fontSize: 12, color: '#475569', lineHeight: 1.5 }}>
+                  <strong>{t.cameraHelpTitle}</strong><br />
+                  {t.cameraHelpText}
+                </div>
+
                 {side.imageError && (
                   <div style={{ marginTop: 8, fontSize: 12, color: '#b91c1c', fontWeight: 600 }}>
                     {side.imageError}
@@ -504,27 +512,29 @@ export default function Page() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 14 }}>
-                <div>
-                  <label>{t.useSizeFrom}</label>
-                  <select
-                    value={side.linkToSide ?? ''}
-                    onChange={(e) =>
-                      updateSide(side.id, {
-                        linkToSide: e.target.value ? Number(e.target.value) : undefined,
-                      })
-                    }
-                    style={inputStyle}
-                  >
-                    <option value="">{t.manualSize}</option>
-                    {sides
-                      .filter((s) => s.id !== side.id)
-                      .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
+                {side.id > 1 && (
+                  <div>
+                    <label>{t.useSizeFrom}</label>
+                    <select
+                      value={side.linkToSide ?? ''}
+                      onChange={(e) =>
+                        updateSide(side.id, {
+                          linkToSide: e.target.value ? Number(e.target.value) : undefined,
+                        })
+                      }
+                      style={inputStyle}
+                    >
+                      <option value="">{t.manualSize}</option>
+                      {sides
+                        .filter((s) => s.id !== side.id)
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label>{t.width}</label>
@@ -553,30 +563,31 @@ export default function Page() {
                 </div>
 
                 <div>
-                  <label>{t.deductionMode}</label>
+                  <label>{t.openings}</label>
                   <select
                     value={side.deductionMode}
-                    onChange={(e) => updateSide(side.id, { deductionMode: e.target.value as 'manual' | 'ai' })}
+                    onChange={(e) => updateSide(side.id, { deductionMode: e.target.value as 'average' | 'manual' })}
                     style={inputStyle}
                   >
-                    <option value="manual">{t.manual}</option>
-                    <option value="ai">{t.automaticAi}</option>
+                    <option value="average">{t.averageOpenings}</option>
+                    <option value="manual">{t.manualOpenings}</option>
                   </select>
                 </div>
 
-                <div>
-                  <label>{side.deductionMode === 'ai' ? t.aiDeduction : t.manualDeduction}</label>
-                  <input
-                    value={side.deductionMode === 'ai' ? side.aiDeductionM2 : side.deductionM2}
-                    onChange={(e) =>
-                      updateSide(
-                        side.id,
-                        side.deductionMode === 'ai' ? { aiDeductionM2: e.target.value } : { deductionM2: e.target.value }
-                      )
-                    }
-                    style={inputStyle}
-                  />
-                </div>
+                {side.deductionMode === 'manual' ? (
+                  <div>
+                    <label>{t.manualDeduction}</label>
+                    <input
+                      value={side.deductionM2}
+                      onChange={(e) => updateSide(side.id, { deductionM2: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: '#475569' }}>
+                    {t.averageHint}
+                  </div>
+                )}
               </div>
 
               <div style={{ marginTop: 14, background: '#fff', borderRadius: 16, padding: 16, border: '1px solid #e2e8f0' }}>
@@ -647,6 +658,12 @@ export default function Page() {
               {t.goToMaterial}
             </button>
           </div>
+
+          {maxSidesMessage && (
+            <div style={{ marginTop: 10, fontSize: 13, color: '#b91c1c', fontWeight: 600 }}>
+              {maxSidesMessage}
+            </div>
+          )}
 
           <div style={{ ...sectionStyle, marginTop: 20 }}>
             <div style={{ fontWeight: 700, marginBottom: 12 }}>{t.result}</div>
@@ -758,13 +775,23 @@ export default function Page() {
           {selectedVisual === 'plastic' && (
             <div style={uploadCardStyle}>
               <label>{t.plasticRef}</label>
-              <div style={{ marginTop: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, marginTop: 10 }}>
                 <label style={{ display: 'block', cursor: 'pointer' }}>
-                  <span style={mobileButtonPrimary}>{t.choosePhoto}</span>
+                  <span style={mobileButtonPrimary}>{t.takePhoto}</span>
                   <input
                     type="file"
                     accept="image/*"
                     capture="environment"
+                    onChange={(e) => handleReferenceImage(e.target.files?.[0], 'plastic')}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+
+                <label style={{ display: 'block', cursor: 'pointer' }}>
+                  <span style={mobileButtonSecondary}>{t.chooseFile}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
                     onChange={(e) => handleReferenceImage(e.target.files?.[0], 'plastic')}
                     style={{ display: 'none' }}
                   />
@@ -776,13 +803,23 @@ export default function Page() {
           {selectedVisual === 'hardwood' && (
             <div style={uploadCardStyle}>
               <label>{t.hardwoodRef}</label>
-              <div style={{ marginTop: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, marginTop: 10 }}>
                 <label style={{ display: 'block', cursor: 'pointer' }}>
-                  <span style={mobileButtonPrimary}>{t.choosePhoto}</span>
+                  <span style={mobileButtonPrimary}>{t.takePhoto}</span>
                   <input
                     type="file"
                     accept="image/*"
                     capture="environment"
+                    onChange={(e) => handleReferenceImage(e.target.files?.[0], 'wood')}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+
+                <label style={{ display: 'block', cursor: 'pointer' }}>
+                  <span style={mobileButtonSecondary}>{t.chooseFile}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
                     onChange={(e) => handleReferenceImage(e.target.files?.[0], 'wood')}
                     style={{ display: 'none' }}
                   />
@@ -848,6 +885,9 @@ const mobileButtonPrimary: React.CSSProperties = {
   cursor: 'pointer',
   fontSize: 15,
   fontWeight: 700,
+  display: 'block',
+  boxSizing: 'border-box',
+  textAlign: 'center',
 };
 
 const mobileButtonSecondary: React.CSSProperties = {
@@ -861,6 +901,9 @@ const mobileButtonSecondary: React.CSSProperties = {
   cursor: 'pointer',
   fontSize: 15,
   fontWeight: 700,
+  display: 'block',
+  boxSizing: 'border-box',
+  textAlign: 'center',
 };
 
 const rowStyle: React.CSSProperties = {
