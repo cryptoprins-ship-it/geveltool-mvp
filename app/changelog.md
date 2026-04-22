@@ -1,3 +1,14 @@
+# Changelog
+
+## v1.2
+- TypeScript-fouten rond gekoppelde zijdes opgelost
+- Automatisch koppelen van Voorzijde/Achterzijde en Linkerzijde/Rechterzijde werkt nu echt
+- Handmatig afmetingen overnemen van een andere zijde vult velden direct in
+- Autosave toegevoegd via localStorage
+- Ingevulde gegevens worden automatisch teruggeladen bij heropenen
+- Reset-knop toegevoegd voor opgeslagen gegevens
+- Opgeslagen foto’s worden niet bewaard; gebruiker krijgt hiervan melding
+
 ## v1.1
 - Nieuwe optie toegevoegd om afmetingen over te nemen van een andere zijde
 - Ondersteuning toegevoegd voor gelijke zijdes, zoals voor/achter en links/rechts
