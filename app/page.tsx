@@ -86,7 +86,8 @@ export default function VisualisatiePage() {
     if (sides.length === 0) return false;
 
     return sides.every((side) => {
-      const hasBaseDimensions = side.width.trim() !== "" && side.height.trim() !== "";
+      const hasBaseDimensions =
+        side.width.trim() !== "" && side.height.trim() !== "";
       if (!hasBaseDimensions) return false;
 
       if (side.openingMode === "skip" || side.openingMode === "none") return true;
@@ -125,7 +126,10 @@ export default function VisualisatiePage() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      updateSide(sideId, (side) => ({ ...side, error: "Gebruik een afbeeldingbestand." }));
+      updateSide(sideId, (side) => ({
+        ...side,
+        error: "Gebruik een afbeeldingbestand.",
+      }));
       return;
     }
 
@@ -201,7 +205,12 @@ export default function VisualisatiePage() {
     }));
   };
 
-  const updateOpening = (sideId: string, openingId: string, field: keyof Opening, value: string) => {
+  const updateOpening = (
+    sideId: string,
+    openingId: string,
+    field: keyof Opening,
+    value: string
+  ) => {
     updateSide(sideId, (side) => ({
       ...side,
       openings: side.openings.map((opening) =>
@@ -269,13 +278,17 @@ export default function VisualisatiePage() {
       updateSide(side.id, (current) => ({
         ...current,
         openingMode: "ai",
-        error: detections.length === 0 ? "AI vond geen openingen. Je kunt handmatig invullen of deze zijde op geen openingen zetten." : "",
+        error:
+          detections.length === 0
+            ? "AI vond geen ramen/deuren. Je kunt handmatig invullen of deze zijde op geen ramen/deuren zetten."
+            : "",
       }));
     } catch (error) {
       console.error(error);
       updateSide(side.id, (current) => ({
         ...current,
-        error: "AI kon de openingen niet inschatten. Vul ze handmatig in of sla deze zijde over.",
+        error:
+          "AI kon de ramen/deuren niet inschatten. Vul ze handmatig in of sla deze zijde over.",
       }));
     } finally {
       setAiLoadingSideId(null);
@@ -303,7 +316,9 @@ export default function VisualisatiePage() {
     setGlobalError("");
 
     if (!canContinue) {
-      setGlobalError("Controleer alle zijdes. Mogelijk ontbreken afmetingen, foto’s of openingen.");
+      setGlobalError(
+        "Controleer alle zijdes. Mogelijk ontbreken afmetingen, foto’s of ramen/deuren."
+      );
       return;
     }
 
@@ -350,381 +365,456 @@ export default function VisualisatiePage() {
   };
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
-      <section className="rounded-2xl border bg-white p-4 md:p-6 text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-black">GevelPlanner</h1>
-        <p className="mt-2 text-base font-medium text-gray-700">Bereken je gevel in 2 minuten</p>
-        <p className="mt-3 text-sm text-gray-600">
-          Voeg per zijde de afmetingen toe en bepaal daarna of deze zijde geen ramen/deuren heeft, door AI moet worden ingeschat, handmatig wordt ingevuld of moet worden overgeslagen.
-        </p>
-      </section>
+    <main className="min-h-screen bg-gray-50 text-black">
+      <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 text-center shadow-sm md:p-6">
+          <h1 className="text-3xl font-bold tracking-tight text-black">GevelPlanner</h1>
+          <p className="mt-2 text-base font-medium text-gray-700">
+            Bereken je gevel in 2 minuten
+          </p>
+          <p className="mt-3 text-sm leading-6 text-gray-600">
+            Voeg per zijde de afmetingen toe en bepaal daarna of deze zijde geen
+            ramen/deuren heeft, door AI moet worden ingeschat, handmatig wordt
+            ingevuld of moet worden overgeslagen.
+          </p>
+        </section>
 
-      {sides.map((side, sideIndex) => (
-        <section key={side.id} className="rounded-2xl border p-4 md:p-6 space-y-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">{side.name}</h2>
-              <p className="text-sm text-gray-600">Geef de afmetingen en kies hoe je met openingen op deze zijde wilt omgaan.</p>
-            </div>
-
-            {sides.length > 1 ? (
-              <button
-                type="button"
-                className="rounded-xl border px-4 py-2 text-sm"
-                onClick={() => removeSide(side.id)}
-              >
-                Verwijder zijde
-              </button>
-            ) : null}
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Breedte zijde (cm)</label>
-              <input
-                className="w-full rounded-xl border p-3"
-                inputMode="numeric"
-                value={side.width}
-                onChange={(e) => setSideField(side.id, "width", e.target.value)}
-                placeholder="Bijv. 540"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium">Hoogte zijde (cm)</label>
-              <input
-                className="w-full rounded-xl border p-3"
-                inputMode="numeric"
-                value={side.height}
-                onChange={(e) => setSideField(side.id, "height", e.target.value)}
-                placeholder="Bijv. 280"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <p className="mb-2 text-sm font-medium">Afbeelding voor deze zijde</p>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  className="rounded-xl border px-4 py-3"
-                  onClick={() => cameraInputRefs.current[side.id]?.click()}
-                >
-                  Maak foto
-                </button>
-
-                <button
-                  type="button"
-                  className="rounded-xl border px-4 py-3"
-                  onClick={() => fileInputRefs.current[side.id]?.click()}
-                >
-                  Kies bestand
-                </button>
-              </div>
-            </div>
-
-            <input
-              ref={(el) => {
-                cameraInputRefs.current[side.id] = el;
-              }}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => handleFileChange(side.id, e)}
-            />
-
-            <input
-              ref={(el) => {
-                fileInputRefs.current[side.id] = el;
-              }}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => handleFileChange(side.id, e)}
-            />
-
-            <p className="text-xs text-gray-500">
-              Werkt foto maken niet? Controleer dan de camera-toestemming in de app- of browserinstellingen op Apple of Android.
-            </p>
-
-            {side.previewUrl ? (
-              <div className="rounded-2xl border p-3">
-                <p className="mb-2 text-sm font-medium">Preview {side.name}</p>
-                <img
-                  src={side.previewUrl}
-                  alt={`Preview van ${side.name}`}
-                  className="max-h-[360px] w-full rounded-xl object-contain"
-                />
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed p-6 text-sm text-gray-500">
-                Nog geen afbeelding gekozen voor {side.name.toLowerCase()}.
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            <p className="text-sm font-medium">Ramen en deuren op deze zijde</p>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {[
-                { value: "none", label: "Geen ramen/deuren" },
-                { value: "ai", label: "AI ramen/deuren laten inschatten" },
-                { value: "manual", label: "Handmatig invullen" },
-                { value: "skip", label: "Overslaan" },
-              ].map((option) => {
-                const checked = side.openingMode === option.value;
-                return (
-                  <label
-                    key={option.value}
-                    className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 ${checked ? "border-black" : ""}`}
-                  >
-                    <input
-                      type="radio"
-                      name={`opening-mode-${side.id}`}
-                      checked={checked}
-                      onChange={() => handleOpeningModeChange(side.id, option.value as OpeningMode)}
-                    />
-                    <span className="text-sm font-medium">{option.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {side.openingMode === "none" ? (
-            <div className="rounded-2xl border bg-gray-50 p-4 text-sm text-gray-700">
-              Deze zijde heeft geen ramen, deuren of andere openingen.
-            </div>
-          ) : null}
-
-          {side.openingMode === "ai" ? (
-            <div className="space-y-4 rounded-2xl border p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h3 className="font-semibold">AI-inschatting ramen en deuren</h3>
-                  <p className="text-sm text-gray-600">
-                    AI gebruikt de foto en de ingevulde breedte en hoogte van deze zijde als schaal voor een eerste schatting van ramen en deuren.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  className="rounded-xl border px-4 py-2 disabled:opacity-50"
-                  onClick={() => estimateOpeningsWithAi(side)}
-                  disabled={aiLoadingSideId === side.id}
-                >
-                  {aiLoadingSideId === side.id ? "AI analyseert..." : "Analyseer foto"}
-                </button>
-              </div>
-
-              {side.aiDetectedCount !== null ? (
-                <div className="rounded-xl border bg-gray-50 p-3 text-sm">
-                  AI heeft {side.aiDetectedCount} raam/deur-openingen gevonden.
-                </div>
-              ) : null}
-
-              {side.openings.length > 0 ? (
-                <div className="space-y-3">
-                  {side.openings.map((opening, openingIndex) => (
-                    <div key={opening.id} className="rounded-2xl border p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium">Voorgestelde opening {openingIndex + 1}</h4>
-                        <button
-                          type="button"
-                          className="text-sm underline"
-                          onClick={() => removeOpening(side.id, opening.id)}
-                        >
-                          Verwijderen
-                        </button>
-                      </div>
-
-                      <div className="grid gap-3 md:grid-cols-4">
-                        <div>
-                          <label className="mb-1 block text-sm">Type</label>
-                          <select
-                            className="w-full rounded-xl border p-2"
-                            value={opening.type}
-                            onChange={(e) => updateOpening(side.id, opening.id, "type", e.target.value)}
-                          >
-                            <option value="window">Raam</option>
-                            <option value="door">Deur</option>
-                            <option value="other">Overig</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block text-sm">Breedte (cm)</label>
-                          <input
-                            className="w-full rounded-xl border p-2"
-                            inputMode="numeric"
-                            value={opening.width}
-                            onChange={(e) => updateOpening(side.id, opening.id, "width", e.target.value)}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block text-sm">Hoogte (cm)</label>
-                          <input
-                            className="w-full rounded-xl border p-2"
-                            inputMode="numeric"
-                            value={opening.height}
-                            onChange={(e) => updateOpening(side.id, opening.id, "height", e.target.value)}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block text-sm">Aantal</label>
-                          <input
-                            className="w-full rounded-xl border p-2"
-                            inputMode="numeric"
-                            value={opening.count}
-                            onChange={(e) => updateOpening(side.id, opening.id, "count", e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  <button
-                    type="button"
-                    className="rounded-xl border px-4 py-2"
-                    onClick={() => addOpening(side.id)}
-                  >
-                    Opening toevoegen
-                  </button>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed p-4 text-sm text-gray-500">
-                  Nog geen AI-resultaten voor deze zijde.
-                </div>
-              )}
-            </div>
-          ) : null}
-
-          {side.openingMode === "manual" ? (
-            <div className="space-y-4 rounded-2xl border p-4">
+        {sides.map((side) => (
+          <section
+            key={side.id}
+            className="space-y-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-6"
+          >
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <h3 className="font-semibold">Handmatige invoer openingen</h3>
+                <h2 className="text-xl font-semibold text-black">{side.name}</h2>
                 <p className="text-sm text-gray-600">
-                  Voeg alleen de ramen, deuren of andere openingen toe die op deze zijde aanwezig zijn.
+                  Geef de afmetingen en kies hoe je met ramen en deuren op deze zijde
+                  wilt omgaan.
                 </p>
               </div>
 
-              {side.openings.length === 0 ? (
-                <div className="rounded-2xl border border-dashed p-4 text-sm text-gray-500">
-                  Nog geen ramen of deuren toegevoegd.
-                </div>
+              {sides.length > 1 ? (
+                <button
+                  type="button"
+                  className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-gray-50"
+                  onClick={() => removeSide(side.id)}
+                >
+                  Verwijder zijde
+                </button>
               ) : null}
+            </div>
 
-              {side.openings.map((opening, openingIndex) => (
-                <div key={opening.id} className="rounded-2xl border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Opening {openingIndex + 1}</h4>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-800">
+                  Breedte zijde (cm)
+                </label>
+                <input
+                  className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
+                  inputMode="numeric"
+                  value={side.width}
+                  onChange={(e) => setSideField(side.id, "width", e.target.value)}
+                  placeholder="Bijv. 540"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-800">
+                  Hoogte zijde (cm)
+                </label>
+                <input
+                  className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
+                  inputMode="numeric"
+                  value={side.height}
+                  onChange={(e) => setSideField(side.id, "height", e.target.value)}
+                  placeholder="Bijv. 280"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <p className="mb-2 text-sm font-medium text-gray-800">
+                  Afbeelding voor deze zijde
+                </p>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50"
+                    onClick={() => cameraInputRefs.current[side.id]?.click()}
+                  >
+                    Maak foto
+                  </button>
+
+                  <button
+                    type="button"
+                    className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50"
+                    onClick={() => fileInputRefs.current[side.id]?.click()}
+                  >
+                    Kies bestand
+                  </button>
+                </div>
+              </div>
+
+              <input
+                ref={(el) => {
+                  cameraInputRefs.current[side.id] = el;
+                }}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => handleFileChange(side.id, e)}
+              />
+
+              <input
+                ref={(el) => {
+                  fileInputRefs.current[side.id] = el;
+                }}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleFileChange(side.id, e)}
+              />
+
+              <p className="text-xs text-gray-500">
+                Werkt foto maken niet? Controleer dan de camera-toestemming in de
+                app- of browserinstellingen op Apple of Android.
+              </p>
+
+              {side.previewUrl ? (
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                  <p className="mb-2 text-sm font-medium text-gray-800">
+                    Preview {side.name}
+                  </p>
+                  <img
+                    src={side.previewUrl}
+                    alt={`Preview van ${side.name}`}
+                    className="max-h-[360px] w-full rounded-xl object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-500">
+                  Nog geen afbeelding gekozen voor {side.name.toLowerCase()}.
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-gray-800">
+                Ramen en deuren op deze zijde
+              </p>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { value: "none", label: "Geen ramen/deuren" },
+                  { value: "ai", label: "AI ramen/deuren laten inschatten" },
+                  { value: "manual", label: "Handmatig invullen" },
+                  { value: "skip", label: "Overslaan" },
+                ].map((option) => {
+                  const checked = side.openingMode === option.value;
+                  return (
+                    <label
+                      key={option.value}
+                      className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition ${
+                        checked
+                          ? "border-black bg-gray-50"
+                          : "border-gray-200 bg-white hover:bg-gray-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`opening-mode-${side.id}`}
+                        checked={checked}
+                        onChange={() =>
+                          handleOpeningModeChange(side.id, option.value as OpeningMode)
+                        }
+                      />
+                      <span className="text-sm font-medium text-black">
+                        {option.label}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {side.openingMode === "none" ? (
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                Deze zijde heeft geen ramen, deuren of andere openingen.
+              </div>
+            ) : null}
+
+            {side.openingMode === "ai" ? (
+              <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="font-semibold text-black">
+                      AI-inschatting ramen en deuren
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      AI gebruikt de foto en de ingevulde breedte en hoogte van deze
+                      zijde als schaal voor een eerste schatting van ramen en deuren.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="rounded-xl border border-gray-300 bg-white px-4 py-2 font-medium text-black transition hover:bg-gray-100 disabled:opacity-50"
+                    onClick={() => estimateOpeningsWithAi(side)}
+                    disabled={aiLoadingSideId === side.id}
+                  >
+                    {aiLoadingSideId === side.id ? "AI analyseert..." : "Analyseer foto"}
+                  </button>
+                </div>
+
+                {side.aiDetectedCount !== null ? (
+                  <div className="rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-700">
+                    AI heeft {side.aiDetectedCount} raam/deur-openingen gevonden.
+                  </div>
+                ) : null}
+
+                {side.openings.length > 0 ? (
+                  <div className="space-y-3">
+                    {side.openings.map((opening, openingIndex) => (
+                      <div
+                        key={opening.id}
+                        className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium text-black">
+                            Voorgestelde opening {openingIndex + 1}
+                          </h4>
+                          <button
+                            type="button"
+                            className="text-sm text-gray-700 underline"
+                            onClick={() => removeOpening(side.id, opening.id)}
+                          >
+                            Verwijderen
+                          </button>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-4">
+                          <div>
+                            <label className="mb-1 block text-sm text-gray-700">Type</label>
+                            <select
+                              className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
+                              value={opening.type}
+                              onChange={(e) =>
+                                updateOpening(side.id, opening.id, "type", e.target.value)
+                              }
+                            >
+                              <option value="window">Raam</option>
+                              <option value="door">Deur</option>
+                              <option value="other">Overig</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-sm text-gray-700">
+                              Breedte (cm)
+                            </label>
+                            <input
+                              className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
+                              inputMode="numeric"
+                              value={opening.width}
+                              onChange={(e) =>
+                                updateOpening(side.id, opening.id, "width", e.target.value)
+                              }
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-sm text-gray-700">
+                              Hoogte (cm)
+                            </label>
+                            <input
+                              className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
+                              inputMode="numeric"
+                              value={opening.height}
+                              onChange={(e) =>
+                                updateOpening(side.id, opening.id, "height", e.target.value)
+                              }
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-sm text-gray-700">
+                              Aantal
+                            </label>
+                            <input
+                              className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
+                              inputMode="numeric"
+                              value={opening.count}
+                              onChange={(e) =>
+                                updateOpening(side.id, opening.id, "count", e.target.value)
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
                     <button
                       type="button"
-                      className="text-sm underline"
-                      onClick={() => removeOpening(side.id, opening.id)}
+                      className="rounded-xl border border-gray-300 bg-white px-4 py-2 font-medium text-black transition hover:bg-gray-50"
+                      onClick={() => addOpening(side.id)}
                     >
-                      Verwijderen
+                      Opening toevoegen
                     </button>
                   </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-500">
+                    Nog geen AI-resultaten voor deze zijde.
+                  </div>
+                )}
+              </div>
+            ) : null}
 
-                  <div className="grid gap-3 md:grid-cols-4">
-                    <div>
-                      <label className="mb-1 block text-sm">Type</label>
-                      <select
-                        className="w-full rounded-xl border p-2"
-                        value={opening.type}
-                        onChange={(e) => updateOpening(side.id, opening.id, "type", e.target.value)}
+            {side.openingMode === "manual" ? (
+              <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div>
+                  <h3 className="font-semibold text-black">Handmatige invoer</h3>
+                  <p className="text-sm text-gray-600">
+                    Voeg alleen de ramen, deuren of andere openingen toe die op deze
+                    zijde aanwezig zijn.
+                  </p>
+                </div>
+
+                {side.openings.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-500">
+                    Nog geen ramen of deuren toegevoegd.
+                  </div>
+                ) : null}
+
+                {side.openings.map((opening, openingIndex) => (
+                  <div
+                    key={opening.id}
+                    className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-black">
+                        Opening {openingIndex + 1}
+                      </h4>
+                      <button
+                        type="button"
+                        className="text-sm text-gray-700 underline"
+                        onClick={() => removeOpening(side.id, opening.id)}
                       >
-                        <option value="window">Raam</option>
-                        <option value="door">Deur</option>
-                        <option value="other">Overig</option>
-                      </select>
+                        Verwijderen
+                      </button>
                     </div>
 
-                    <div>
-                      <label className="mb-1 block text-sm">Breedte (cm)</label>
-                      <input
-                        className="w-full rounded-xl border p-2"
-                        inputMode="numeric"
-                        value={opening.width}
-                        onChange={(e) => updateOpening(side.id, opening.id, "width", e.target.value)}
-                      />
-                    </div>
+                    <div className="grid gap-3 md:grid-cols-4">
+                      <div>
+                        <label className="mb-1 block text-sm text-gray-700">Type</label>
+                        <select
+                          className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
+                          value={opening.type}
+                          onChange={(e) =>
+                            updateOpening(side.id, opening.id, "type", e.target.value)
+                          }
+                        >
+                          <option value="window">Raam</option>
+                          <option value="door">Deur</option>
+                          <option value="other">Overig</option>
+                        </select>
+                      </div>
 
-                    <div>
-                      <label className="mb-1 block text-sm">Hoogte (cm)</label>
-                      <input
-                        className="w-full rounded-xl border p-2"
-                        inputMode="numeric"
-                        value={opening.height}
-                        onChange={(e) => updateOpening(side.id, opening.id, "height", e.target.value)}
-                      />
-                    </div>
+                      <div>
+                        <label className="mb-1 block text-sm text-gray-700">
+                          Breedte (cm)
+                        </label>
+                        <input
+                          className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
+                          inputMode="numeric"
+                          value={opening.width}
+                          onChange={(e) =>
+                            updateOpening(side.id, opening.id, "width", e.target.value)
+                          }
+                        />
+                      </div>
 
-                    <div>
-                      <label className="mb-1 block text-sm">Aantal</label>
-                      <input
-                        className="w-full rounded-xl border p-2"
-                        inputMode="numeric"
-                        value={opening.count}
-                        onChange={(e) => updateOpening(side.id, opening.id, "count", e.target.value)}
-                      />
+                      <div>
+                        <label className="mb-1 block text-sm text-gray-700">
+                          Hoogte (cm)
+                        </label>
+                        <input
+                          className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
+                          inputMode="numeric"
+                          value={opening.height}
+                          onChange={(e) =>
+                            updateOpening(side.id, opening.id, "height", e.target.value)
+                          }
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-sm text-gray-700">
+                          Aantal
+                        </label>
+                        <input
+                          className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
+                          inputMode="numeric"
+                          value={opening.count}
+                          onChange={(e) =>
+                            updateOpening(side.id, opening.id, "count", e.target.value)
+                          }
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
 
-              <button
-                type="button"
-                className="rounded-xl border px-4 py-2"
-                onClick={() => addOpening(side.id)}
-              >
-                Raam / deur toevoegen
-              </button>
-            </div>
-          ) : null}
+                <button
+                  type="button"
+                  className="rounded-xl border border-gray-300 bg-white px-4 py-2 font-medium text-black transition hover:bg-gray-50"
+                  onClick={() => addOpening(side.id)}
+                >
+                  Raam / deur toevoegen
+                </button>
+              </div>
+            ) : null}
 
-          {side.error ? (
-            <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
-              {side.error}
-            </div>
-          ) : null}
+            {side.error ? (
+              <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                {side.error}
+              </div>
+            ) : null}
+          </section>
+        ))}
+
+        <section className="flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50 disabled:opacity-50"
+            onClick={addSide}
+            disabled={sides.length >= MAX_SIDES}
+          >
+            Zijde toevoegen
+          </button>
+
+          <button
+            type="button"
+            className="rounded-xl bg-black px-5 py-3 text-white disabled:opacity-50"
+            onClick={handleContinue}
+            disabled={!canContinue || isSubmitting}
+          >
+            {isSubmitting ? "Bezig..." : "Verder"}
+          </button>
         </section>
-      ))}
 
-      <section className="flex flex-col gap-3 sm:flex-row">
-        <button
-          type="button"
-          className="rounded-xl border px-4 py-3 disabled:opacity-50"
-          onClick={addSide}
-          disabled={sides.length >= MAX_SIDES}
-        >
-          Zijde toevoegen
-        </button>
+        {globalError ? (
+          <section className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+            {globalError}
+          </section>
+        ) : null}
 
-        <button
-          type="button"
-          className="rounded-xl bg-black px-5 py-3 text-white disabled:opacity-50"
-          onClick={handleContinue}
-          disabled={!canContinue || isSubmitting}
-        >
-          {isSubmitting ? "Bezig..." : "Verder"}
-        </button>
-      </section>
-
-      {globalError ? (
-        <section className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
-          {globalError}
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm">
+          AI geeft een eerste inschatting op basis van foto plus opgegeven
+          zijdebreedte en zijdehoogte. Controleer en corrigeer de voorgestelde
+          ramen en deuren altijd voordat je verdergaat.
         </section>
-      ) : null}
-
-      <section className="rounded-2xl border p-4 text-sm text-gray-600">
-        AI geeft een eerste inschatting op basis van foto plus opgegeven zijdebreedte en zijdehoogte. Controleer en corrigeer de voorgestelde ramen en deuren altijd voordat je verdergaat.
-      </section>
+      </div>
     </main>
   );
 }
