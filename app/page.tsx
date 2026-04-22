@@ -156,11 +156,11 @@ export default function Page() {
     selectedVisual === 'plastic' ? plasticRef : selectedVisual === 'hardwood' ? woodRef : undefined;
 
   return (
-    <main style={{ minHeight: '100vh', background: '#f8fafc', padding: 24, fontFamily: 'Arial, sans-serif' }}>
+    <main style={{ minHeight: '100vh', background: '#f8fafc', padding: 24, fontFamily: 'Arial, sans-serif', color: '#000' }}>
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>
         <div style={{ background: '#fff', borderRadius: 24, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,.08)', marginBottom: 24 }}>
           <h1 style={{ fontSize: 32, margin: 0 }}>GevelTool MVP</h1>
-          <p style={{ color: '#475569', marginTop: 12 }}>
+          <p style={{ color: '#000', marginTop: 12 }}>
             Upload foto’s per gevelzijde, vul breedte en hoogte in, trek kozijnen handmatig of via AI-schatting af en vergelijk direct kunststof, hardhout of verf.
           </p>
         </div>
@@ -176,7 +176,7 @@ export default function Page() {
                     <input
                       value={side.name}
                       onChange={(e) => updateSide(side.id, { name: e.target.value })}
-                      style={{ padding: 10, borderRadius: 12, border: '1px solid #cbd5e1', minWidth: 180 }}
+                      style={{ padding: 10, borderRadius: 12, border: '1px solid #cbd5e1', minWidth: 180, color: '#000' }}
                     />
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button onClick={() => runAiEstimate(side.id)} style={btnSecondary}>AI schatting</button>
@@ -227,11 +227,12 @@ export default function Page() {
                           type="file"
                           accept="image/*"
                           onChange={(e) => updateSide(side.id, { image: uploadPreview(e.target.files?.[0]) })}
+                          style={{ color: '#000' }}
                         />
                       </div>
                     </div>
 
-                    <div style={{ background: '#fff', borderRadius: 16, padding: 16, border: '1px solid #e2e8f0' }}>
+                    <div style={{ background: '#fff', borderRadius: 16, padding: 16, border: '1px solid #e2e8f0', color: '#000' }}>
                       <div style={{ fontWeight: 700, marginBottom: 10 }}>Resultaat</div>
                       <div style={rowStyle}><span>Bruto</span><span>{side.grossM2.toFixed(2)} m²</span></div>
                       <div style={rowStyle}><span>Aftrek</span><span>{side.safeDeduction.toFixed(2)} m²</span></div>
@@ -346,7 +347,7 @@ export default function Page() {
                 <input value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)} style={inputStyle} />
               </div>
 
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16, marginTop: 16 }}>
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16, marginTop: 16, color: '#000' }}>
                 <div style={rowStyle}><span>Bruto oppervlak</span><span>{totals.grossM2.toFixed(2)} m²</span></div>
                 <div style={rowStyle}><span>Aftrek openingen</span><span>{totals.deductionM2.toFixed(2)} m²</span></div>
                 <div style={{ ...rowStyle, fontWeight: 700 }}><span>Netto oppervlak</span><span>{totals.netM2.toFixed(2)} m²</span></div>
@@ -369,7 +370,7 @@ export default function Page() {
                 <div style={{ marginBottom: 16 }}>
                   <label>Referentiefoto kunststof</label>
                   <div style={{ marginTop: 6 }}>
-                    <input type="file" accept="image/*" onChange={(e) => setPlasticRef(uploadPreview(e.target.files?.[0]))} />
+                    <input type="file" accept="image/*" onChange={(e) => setPlasticRef(uploadPreview(e.target.files?.[0]))} style={{ color: '#000' }} />
                   </div>
                 </div>
               )}
@@ -378,7 +379,7 @@ export default function Page() {
                 <div style={{ marginBottom: 16 }}>
                   <label>Referentiefoto hardhout</label>
                   <div style={{ marginTop: 6 }}>
-                    <input type="file" accept="image/*" onChange={(e) => setWoodRef(uploadPreview(e.target.files?.[0]))} />
+                    <input type="file" accept="image/*" onChange={(e) => setWoodRef(uploadPreview(e.target.files?.[0]))} style={{ color: '#000' }} />
                   </div>
                 </div>
               )}
@@ -426,6 +427,7 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid #cbd5e1',
   marginTop: 6,
   boxSizing: 'border-box',
+  color: '#000',
 };
 
 const btnPrimary: React.CSSProperties = {
