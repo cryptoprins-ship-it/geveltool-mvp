@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 type InputMode = "quick" | "advanced";
+type StepMode = "surface" | "material" | "result";
 type OpeningMode = "none" | "ai" | "manual" | "estimate" | "skip";
 type OpeningType = "window" | "door" | "other";
 type FrameSizeType = "small" | "medium" | "large";
@@ -31,41 +32,71 @@ type Side = {
   linkToSideId?: string;
 };
 
+type ProductType =
+  | "panel"
+  | "starter_profile"
+  | "end_profile"
+  | "corner_profile_external"
+  | "corner_profile_internal"
+  | "connection_profile_visible"
+  | "connection_profile_base"
+  | "substructure";
+
+type SpanlSystemProduct = {
+  id: string;
+  active: boolean;
+  sku: string;
+  name: string;
+  type: ProductType;
+  color: string;
+  finish?: string;
+  lengthMm: number;
+  workHeightMm?: number;
+  thicknessMm?: number;
+  areaM2?: number;
+  priceExVat: number;
+  notes?: string;
+};
+
+type ProductLibrary = {
+  panels: SpanlSystemProduct[];
+  accessories: SpanlSystemProduct[];
+};
+
+type MaterialSystem = "spanl_pb7038a";
+
+type MaterialConfig = {
+  system: MaterialSystem;
+  discountPercent: string;
+  wastePercent: string;
+  outsideCorners: string;
+  insideCorners: string;
+  railSpacingCm: string;
+};
+
 type SavedSide = Omit<Side, "photo" | "previewUrl"> & {
   photo: null;
   previewUrl: "";
 };
 
 type SavedState = {
+  currentStep: StepMode;
   inputMode: InputMode;
   sideCount: number;
   frontBackEqual: boolean | null;
   leftRightEqual: boolean | null;
   sides: SavedSide[];
+  materialConfig: MaterialConfig;
+  productLibrary: ProductLibrary;
 };
 
-type AiDetection = {
-  type: OpeningType;
-  widthEstimateCm: number;
-  heightEstimateCm: number;
-  count: number;
-};
-
+const STORAGE_KEY = "gevelplanner-v3";
 const MAX_SIDES = 10;
-const STORAGE_KEY = "gevelplanner-data-v1-4";
 
 const frameSizeAverages: Record<FrameSizeType, number> = {
   small: 1.0,
   medium: 1.6,
   large: 2.5,
-};
-
-const openingModeLabels: Record<OpeningMode, string> = {
-  none: "Geen ramen/deuren",
-  ai: "AI laten inschatten",
-  manual: "Handmatig invullen",
-  estimate: "Gemiddeld inschatten",
-  skip: "Overslaan",
 };
 
 function getDefaultSideName(index: number): string {
@@ -105,6 +136,113 @@ function buildSides(count: number): Side[] {
   return Array.from({ length: count }, (_, index) => createSide(index));
 }
 
+function createDefaultLibrary(): ProductLibrary {
+  return {
+    panels: [
+      {
+        id: "pb7038a-panel",
+        active: true,
+        sku: "PB7038A",
+        name: "PB7038A Mono flat matt grey",
+        type: "panel",
+        color: "RAL7038 matt grey",
+        finish: "Smalle naad / glad",
+        lengthMm: 4200,
+        workHeightMm: 370,
+        thicknessMm: 16,
+        areaM2: 1.554,
+        priceExVat: 45.73,
+        notes:
+          "16mm dun, extra isolatiewaarde 0,74 m2.K/W, onderhoudsvrij, brandklasse A2, vuilafstotende Akzo Nobel coating",
+      },
+    ],
+    accessories: [
+      {
+        id: "qbj-starter-3m",
+        active: true,
+        sku: "QBJ",
+        name: "QBJ startersprofiel aluminium",
+        type: "starter_profile",
+        color: "aluminium",
+        lengthMm: 3000,
+        priceExVat: 7.95,
+      },
+      {
+        id: "sbt-j-7038-38m",
+        active: true,
+        sku: "SBT",
+        name: "SBT J Channel eindprofiel RAL7038 matt grey",
+        type: "end_profile",
+        color: "RAL7038 matt grey",
+        lengthMm: 3800,
+        priceExVat: 14.95,
+      },
+      {
+        id: "yj01-7021-3m",
+        active: true,
+        sku: "YJ01",
+        name: "YJ01 hoekprofiel RAL7021",
+        type: "corner_profile_external",
+        color: "RAL7021",
+        lengthMm: 3000,
+        priceExVat: 12.95,
+      },
+      {
+        id: "yinj03-7038-3m",
+        active: true,
+        sku: "YINJ03",
+        name: "YINJ03 inside corner 7038",
+        type: "corner_profile_internal",
+        color: "RAL7038 matt grey",
+        lengthMm: 3000,
+        priceExVat: 19.95,
+      },
+      {
+        id: "pjdz-3m",
+        active: true,
+        sku: "PJDZ",
+        name: "PJDZ verbindingsprofiel aluminium",
+        type: "connection_profile_base",
+        color: "aluminium",
+        lengthMm: 3000,
+        priceExVat: 9.95,
+      },
+      {
+        id: "pj01-7038-38m",
+        active: true,
+        sku: "PJ01",
+        name: "PJ01 verbindingsprofiel RAL7038 matt grey",
+        type: "connection_profile_visible",
+        color: "RAL7038 matt grey",
+        lengthMm: 3800,
+        priceExVat: 14.95,
+      },
+      {
+        id: "rail-default",
+        active: true,
+        sku: "RAIL",
+        name: "Montagerail / onderconstructie",
+        type: "substructure",
+        color: "aluminium",
+        lengthMm: 3000,
+        priceExVat: 5.0,
+        notes: "Placeholder prijs, later vervangen door echte railprijs",
+      },
+    ],
+  };
+}
+
+function createDefaultMaterialConfig(): MaterialConfig {
+  return {
+    system: "spanl_pb7038a",
+    discountPercent: "0",
+    wastePercent: "5",
+    outsideCorners: "4",
+    insideCorners: "0",
+    railSpacingCm: "60",
+  };
+}
+
 function toNumber(value: string): number {
   const parsed = Number(String(value).replace(",", "."));
   return Number.isFinite(parsed) ? parsed : 0;
@@ -126,9 +264,12 @@ function isValidSavedState(value: unknown): value is SavedState {
   if (!value || typeof value !== "object") return false;
   const data = value as Partial<SavedState>;
   return (
-    (data.inputMode === "quick" || data.inputMode === "advanced") &&
+    !!data.currentStep &&
+    !!data.inputMode &&
     typeof data.sideCount === "number" &&
-    Array.isArray(data.sides)
+    Array.isArray(data.sides) &&
+    !!data.materialConfig &&
+    !!data.productLibrary
   );
 }
 
@@ -168,16 +309,27 @@ function getSourceSide(
   return { source: undefined, isAuto: false };
 }
 
+function downloadJson(filename: string, data: unknown) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function Page() {
+  const [currentStep, setCurrentStep] = useState<StepMode>("surface");
   const [inputMode, setInputMode] = useState<InputMode>("quick");
   const [sideCount, setSideCount] = useState(4);
   const [frontBackEqual, setFrontBackEqual] = useState<boolean | null>(true);
   const [leftRightEqual, setLeftRightEqual] = useState<boolean | null>(true);
   const [sides, setSides] = useState<Side[]>(buildSides(4));
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [materialConfig, setMaterialConfig] = useState<MaterialConfig>(createDefaultMaterialConfig());
+  const [productLibrary, setProductLibrary] = useState<ProductLibrary>(createDefaultLibrary());
   const [globalError, setGlobalError] = useState("");
   const [globalInfo, setGlobalInfo] = useState("");
-  const [aiLoadingSideId, setAiLoadingSideId] = useState<string | null>(null);
   const [hasLoadedSavedState, setHasLoadedSavedState] = useState(false);
 
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -191,13 +343,13 @@ export default function Page() {
         setHasLoadedSavedState(true);
         return;
       }
-
       const parsed = JSON.parse(raw) as unknown;
       if (!isValidSavedState(parsed)) {
         setHasLoadedSavedState(true);
         return;
       }
 
+      setCurrentStep(parsed.currentStep);
       setInputMode(parsed.inputMode);
       setSideCount(parsed.sideCount);
       setFrontBackEqual(parsed.frontBackEqual ?? null);
@@ -210,9 +362,11 @@ export default function Page() {
           previewUrl: "",
         }))
       );
-      setGlobalInfo("Opgeslagen gegevens zijn geladen. Foto’s moet je opnieuw kiezen.");
+      setMaterialConfig(parsed.materialConfig);
+      setProductLibrary(parsed.productLibrary);
+      setGlobalInfo("Opgeslagen gegevens zijn geladen. Zijfoto’s moet je opnieuw kiezen.");
     } catch (error) {
-      console.error("Fout bij laden van opgeslagen gegevens", error);
+      console.error(error);
     } finally {
       setHasLoadedSavedState(true);
     }
@@ -229,9 +383,7 @@ export default function Page() {
       previewUrlsRef.current.forEach((url) => {
         try {
           URL.revokeObjectURL(url);
-        } catch {
-          // ignore cleanup
-        }
+        } catch {}
       });
     };
   }, []);
@@ -240,40 +392,41 @@ export default function Page() {
     if (!hasLoadedSavedState) return;
 
     const data: SavedState = {
+      currentStep,
       inputMode,
       sideCount,
       frontBackEqual,
       leftRightEqual,
       sides: sanitizeSidesForSave(sides),
+      materialConfig,
+      productLibrary,
     };
 
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (error) {
-      console.error("Fout bij opslaan in localStorage", error);
-    }
-  }, [hasLoadedSavedState, inputMode, sideCount, frontBackEqual, leftRightEqual, sides]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }, [
+    hasLoadedSavedState,
+    currentStep,
+    inputMode,
+    sideCount,
+    frontBackEqual,
+    leftRightEqual,
+    sides,
+    materialConfig,
+    productLibrary,
+  ]);
 
   const updateSide = (sideId: string, updater: (side: Side) => Side) => {
     setSides((prev) => prev.map((side) => (side.id === sideId ? updater(side) : side)));
   };
 
-  const setSideField = <K extends keyof Side>(
-    sideId: string,
-    field: K,
-    value: Side[K]
-  ) => {
+  const setSideField = <K extends keyof Side>(sideId: string, field: K, value: Side[K]) => {
     updateSide(sideId, (side) => ({ ...side, [field]: value }));
   };
 
   const handleNewImage = (sideId: string, file: File | null) => {
     if (!file) return;
-
     if (!file.type.startsWith("image/")) {
-      updateSide(sideId, (side) => ({
-        ...side,
-        error: "Gebruik een afbeeldingbestand.",
-      }));
+      updateSide(sideId, (side) => ({ ...side, error: "Gebruik een afbeeldingbestand." }));
       return;
     }
 
@@ -288,10 +441,7 @@ export default function Page() {
     });
   };
 
-  const handleFileChange = (
-    sideId: string,
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleFileChange = (sideId: string, e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     handleNewImage(sideId, file);
     e.target.value = "";
@@ -305,6 +455,7 @@ export default function Page() {
           openingMode: "none",
           openings: [],
           aiDetectedCount: 0,
+          frameCount: "",
           error: "",
         };
       }
@@ -314,6 +465,7 @@ export default function Page() {
           openingMode: "skip",
           openings: [],
           aiDetectedCount: null,
+          frameCount: "",
           error: "",
         };
       }
@@ -366,134 +518,6 @@ export default function Page() {
     }));
   };
 
-  const applyAiResults = (sideId: string, detections: AiDetection[]) => {
-    updateSide(sideId, (side) => ({
-      ...side,
-      aiDetectedCount: detections.reduce((sum, item) => sum + item.count, 0),
-      frameCount: String(detections.reduce((sum, item) => sum + item.count, 0) || ""),
-      openings: detections.map((detection) => ({
-        id: crypto.randomUUID(),
-        type: detection.type,
-        width: String(detection.widthEstimateCm),
-        height: String(detection.heightEstimateCm),
-        count: String(detection.count),
-      })),
-      error: "",
-    }));
-  };
-
-  const getResolvedWidth = (
-    side: Side,
-    index: number
-  ): string => {
-    const { source } = getSourceSide(side, index, sides, frontBackEqual, leftRightEqual);
-    return source ? source.width : side.width;
-  };
-
-  const getResolvedHeight = (
-    side: Side,
-    index: number
-  ): string => {
-    const { source } = getSourceSide(side, index, sides, frontBackEqual, leftRightEqual);
-    return source ? source.height : side.height;
-  };
-
-  const estimateOpeningsWithAi = async (side: Side, index: number) => {
-    if (!side.photo) {
-      updateSide(side.id, (current) => ({
-        ...current,
-        error: "Voeg eerst een foto of bestand toe voor deze zijde.",
-      }));
-      return;
-    }
-
-    const widthValue = getResolvedWidth(side, index);
-    const heightValue = getResolvedHeight(side, index);
-
-    if (!widthValue.trim() || !heightValue.trim()) {
-      updateSide(side.id, (current) => ({
-        ...current,
-        error: "Vul eerst breedte en hoogte van deze zijde in.",
-      }));
-      return;
-    }
-
-    try {
-      setAiLoadingSideId(side.id);
-      updateSide(side.id, (current) => ({ ...current, error: "" }));
-
-      const formData = new FormData();
-      formData.append("image", side.photo);
-      formData.append("sideWidthCm", widthValue);
-      formData.append("sideHeightCm", heightValue);
-      formData.append("sideName", side.name);
-
-      const response = await fetch("/api/estimate-openings", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "AI-inschatting mislukt.");
-      }
-
-      const data = await response.json();
-      const detections = Array.isArray(data.openings) ? data.openings : [];
-
-      if (detections.length > 0) {
-        applyAiResults(side.id, detections);
-        updateSide(side.id, (current) => ({
-          ...current,
-          openingMode: "ai",
-          error: "",
-        }));
-      } else {
-        updateSide(side.id, (current) => ({
-          ...current,
-          openingMode: "estimate",
-          error:
-            "AI vond geen duidelijke ramen/deuren. Gebruik de gemiddelde inschatting hieronder.",
-        }));
-      }
-    } catch (error) {
-      console.error(error);
-      updateSide(side.id, (current) => ({
-        ...current,
-        openingMode: "estimate",
-        error:
-          "AI kon niets bruikbaars vinden. Gebruik de gemiddelde inschatting of vul handmatig in.",
-      }));
-    } finally {
-      setAiLoadingSideId(null);
-    }
-  };
-
-  const addSide = () => {
-    setSides((prev) => {
-      if (prev.length >= MAX_SIDES) return prev;
-      setSideCount(prev.length + 1);
-      return [...prev, createSide(prev.length)];
-    });
-  };
-
-  const removeSide = (sideId: string) => {
-    setSides((prev) => {
-      const sideToDelete = prev.find((side) => side.id === sideId);
-      if (sideToDelete?.previewUrl) URL.revokeObjectURL(sideToDelete.previewUrl);
-
-      const filtered = prev.filter((side) => side.id !== sideId);
-      setSideCount(filtered.length);
-
-      return filtered.map((side, index) => ({
-        ...side,
-        name: getDefaultSideName(index),
-        linkToSideId:
-          side.linkToSideId === sideId ? undefined : side.linkToSideId,
-      }));
-    });
-  };
-
   const resetSidesByCount = (count: number) => {
     setSideCount(count);
     setSides(buildSides(count));
@@ -510,33 +534,39 @@ export default function Page() {
   const handleManualLinkChange = (sideId: string, sourceId: string) => {
     setSides((prev) =>
       prev.map((side) =>
-        side.id === sideId
-          ? {
-              ...side,
-              linkToSideId: sourceId || undefined,
-            }
-          : side
+        side.id === sideId ? { ...side, linkToSideId: sourceId || undefined } : side
       )
     );
   };
 
   const resetSavedData = () => {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-      sides.forEach((side) => {
-        if (side.previewUrl) URL.revokeObjectURL(side.previewUrl);
-      });
-    } catch (error) {
-      console.error("Fout bij verwijderen opgeslagen gegevens", error);
-    }
+    localStorage.removeItem(STORAGE_KEY);
+    previewUrlsRef.current.forEach((url) => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {}
+    });
 
+    setCurrentStep("surface");
     setInputMode("quick");
     setSideCount(4);
     setFrontBackEqual(true);
     setLeftRightEqual(true);
     setSides(buildSides(4));
+    setMaterialConfig(createDefaultMaterialConfig());
+    setProductLibrary(createDefaultLibrary());
     setGlobalError("");
     setGlobalInfo("Opgeslagen gegevens zijn verwijderd.");
+  };
+
+  const getResolvedWidth = (side: Side, index: number): string => {
+    const { source } = getSourceSide(side, index, sides, frontBackEqual, leftRightEqual);
+    return source ? source.width : side.width;
+  };
+
+  const getResolvedHeight = (side: Side, index: number): string => {
+    const { source } = getSourceSide(side, index, sides, frontBackEqual, leftRightEqual);
+    return source ? source.height : side.height;
   };
 
   const getEstimatedDeductionM2 = (side: Side) => {
@@ -571,25 +601,14 @@ export default function Page() {
     return round2(Math.max(0, getGrossAreaM2(side, index) - getOpeningAreaM2(side)));
   };
 
-  const canContinue = useMemo(() => {
-    if (sides.length === 0) return false;
-
-    return sides.every((side, index) => {
+  const canGoToMaterial = useMemo(() => {
+    return sides.some((side, index) => {
       const widthValue = getResolvedWidth(side, index);
       const heightValue = getResolvedHeight(side, index);
-      const hasBaseDimensions =
-        widthValue.trim() !== "" && heightValue.trim() !== "";
+      if (!widthValue.trim() || !heightValue.trim()) return false;
 
-      if (!hasBaseDimensions) return false;
-
-      if (side.openingMode === "skip" || side.openingMode === "none") return true;
-      if (side.openingMode === "estimate") return toNumber(side.frameCount) > 0;
-      if (!side.photo) return false;
-
-      if (side.openingMode === "ai") {
-        return side.openings.length > 0 || !!side.frameCount;
-      }
-
+      if (side.openingMode === "none" || side.openingMode === "skip") return true;
+      if (side.openingMode === "estimate") return true;
       if (side.openingMode === "manual") {
         return (
           side.openings.length > 0 &&
@@ -601,8 +620,7 @@ export default function Page() {
           )
         );
       }
-
-      return true;
+      return !!side.photo;
     });
   }, [sides, frontBackEqual, leftRightEqual]);
 
@@ -615,9 +633,7 @@ export default function Page() {
           return sum + getGrossAreaM2(side, index);
         }, 0)
       ),
-      opening: round2(
-        includedSides.reduce((sum, side) => sum + getOpeningAreaM2(side), 0)
-      ),
+      opening: round2(includedSides.reduce((sum, side) => sum + getOpeningAreaM2(side), 0)),
       net: round2(
         includedSides.reduce((sum, side) => {
           const index = sides.findIndex((s) => s.id === side.id);
@@ -627,762 +643,762 @@ export default function Page() {
     };
   }, [sides, frontBackEqual, leftRightEqual]);
 
-  const handleContinue = async () => {
-    setGlobalError("");
-    if (!canContinue) {
-      setGlobalError(
-        "Controleer alle zijdes. Mogelijk ontbreken afmetingen, foto’s of ramen/deuren."
-      );
-      return;
+  const activeProducts = useMemo(() => {
+    return {
+      panel: productLibrary.panels.find((p) => p.active && p.type === "panel"),
+      starter: productLibrary.accessories.find((p) => p.active && p.type === "starter_profile"),
+      end: productLibrary.accessories.find((p) => p.active && p.type === "end_profile"),
+      outsideCorner: productLibrary.accessories.find(
+        (p) => p.active && p.type === "corner_profile_external"
+      ),
+      insideCorner: productLibrary.accessories.find(
+        (p) => p.active && p.type === "corner_profile_internal"
+      ),
+      connectionBase: productLibrary.accessories.find(
+        (p) => p.active && p.type === "connection_profile_base"
+      ),
+      connectionVisible: productLibrary.accessories.find(
+        (p) => p.active && p.type === "connection_profile_visible"
+      ),
+      rail: productLibrary.accessories.find((p) => p.active && p.type === "substructure"),
+    };
+  }, [productLibrary]);
+
+  const result = useMemo(() => {
+    const panel = activeProducts.panel;
+    const starter = activeProducts.starter;
+    const end = activeProducts.end;
+    const outsideCorner = activeProducts.outsideCorner;
+    const insideCorner = activeProducts.insideCorner;
+    const connectionBase = activeProducts.connectionBase;
+    const connectionVisible = activeProducts.connectionVisible;
+    const rail = activeProducts.rail;
+
+    if (!panel || !starter || !end || !outsideCorner || !insideCorner || !connectionBase || !connectionVisible || !rail) {
+      return null;
     }
+
+    const includedSides = sides.filter((side) => side.openingMode !== "skip");
+
+    let panelCount = 0;
+    let starterCount = 0;
+    let endCount = 0;
+    let connectionBaseCount = 0;
+    let connectionVisibleCount = 0;
+    let railCount = 0;
+    let totalRailMeters = 0;
+
+    for (const side of includedSides) {
+      const index = sides.findIndex((s) => s.id === side.id);
+      const widthCm = toNumber(getResolvedWidth(side, index));
+      const heightCm = toNumber(getResolvedHeight(side, index));
+      if (widthCm <= 0 || heightCm <= 0) continue;
+
+      const rows = Math.ceil(heightCm / 37);
+      const perRow = Math.ceil(widthCm / 420);
+      panelCount += rows * perRow;
+
+      starterCount += Math.ceil(widthCm / (starter.lengthMm / 10));
+      endCount += Math.ceil(widthCm / (end.lengthMm / 10));
+
+      const verticalJoints = Math.max(perRow - 1, 0);
+      if (verticalJoints > 0) {
+        connectionBaseCount += Math.ceil(heightCm / (connectionBase.lengthMm / 10)) * verticalJoints;
+        connectionVisibleCount += Math.ceil(heightCm / (connectionVisible.lengthMm / 10)) * verticalJoints;
+      }
+
+      const rails = Math.ceil(widthCm / Math.max(1, toNumber(materialConfig.railSpacingCm)));
+      railCount += rails;
+      totalRailMeters += rails * (heightCm / 100);
+    }
+
+    const wasteFactor = 1 + toNumber(materialConfig.wastePercent) / 100;
+    const discountFactor = 1 - toNumber(materialConfig.discountPercent) / 100;
+
+    const panelCountWithWaste = Math.ceil(panelCount * wasteFactor);
+
+    const outsideCornerPieces =
+      Math.ceil(
+        Math.max(...includedSides.map((side) => {
+          const index = sides.findIndex((s) => s.id === side.id);
+          return toNumber(getResolvedHeight(side, index));
+        }), 0) / (outsideCorner.lengthMm / 10)
+      ) * toNumber(materialConfig.outsideCorners);
+
+    const insideCornerPieces =
+      Math.ceil(
+        Math.max(...includedSides.map((side) => {
+          const index = sides.findIndex((s) => s.id === side.id);
+          return toNumber(getResolvedHeight(side, index));
+        }), 0) / (insideCorner.lengthMm / 10)
+      ) * toNumber(materialConfig.insideCorners);
+
+    const panelCost = panelCountWithWaste * panel.priceExVat;
+    const starterCost = starterCount * starter.priceExVat;
+    const endCost = endCount * end.priceExVat;
+    const outsideCornerCost = outsideCornerPieces * outsideCorner.priceExVat;
+    const insideCornerCost = insideCornerPieces * insideCorner.priceExVat;
+    const connectionBaseCost = connectionBaseCount * connectionBase.priceExVat;
+    const connectionVisibleCost = connectionVisibleCount * connectionVisible.priceExVat;
+
+    const railPieceCount = Math.ceil(totalRailMeters / (rail.lengthMm / 1000));
+    const railCost = railPieceCount * rail.priceExVat;
+
+    const subtotal =
+      panelCost +
+      starterCost +
+      endCost +
+      outsideCornerCost +
+      insideCornerCost +
+      connectionBaseCost +
+      connectionVisibleCost +
+      railCost;
+
+    const totalAfterDiscount = subtotal * discountFactor;
+
+    return {
+      panelCount,
+      panelCountWithWaste,
+      starterCount,
+      endCount,
+      outsideCornerPieces,
+      insideCornerPieces,
+      connectionBaseCount,
+      connectionVisibleCount,
+      railPieceCount,
+      totalRailMeters: round2(totalRailMeters),
+      panelCost: round2(panelCost),
+      starterCost: round2(starterCost),
+      endCost: round2(endCost),
+      outsideCornerCost: round2(outsideCornerCost),
+      insideCornerCost: round2(insideCornerCost),
+      connectionBaseCost: round2(connectionBaseCost),
+      connectionVisibleCost: round2(connectionVisibleCost),
+      railCost: round2(railCost),
+      subtotal: round2(subtotal),
+      totalAfterDiscount: round2(totalAfterDiscount),
+    };
+  }, [activeProducts, sides, materialConfig, frontBackEqual, leftRightEqual]);
+
+  const handleImportProducts = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
 
     try {
-      setIsSubmitting(true);
-
-      const formData = new FormData();
-      const payload = sides.map((side, index) => ({
-        id: side.id,
-        name: side.name,
-        width: getResolvedWidth(side, index),
-        height: getResolvedHeight(side, index),
-        openingMode: side.openingMode,
-        aiDetectedCount: side.aiDetectedCount,
-        frameCount: side.frameCount,
-        frameSizeType: side.frameSizeType,
-        openings: side.openings,
-        linkToSideId: side.linkToSideId,
-      }));
-
-      formData.append("sides", JSON.stringify(payload));
-      sides.forEach((side) => {
-        if (side.photo) formData.append(`photo_${side.id}`, side.photo);
-      });
-
-      const response = await fetch("/api/visualize", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error("Visualisatie mislukt.");
-      const data = await response.json();
-      console.log("Visualisatie succesvol", data);
-      setGlobalInfo("Gegevens verzonden voor berekening/visualisatie.");
+      const text = await file.text();
+      const parsed = JSON.parse(text) as ProductLibrary;
+      if (!parsed.panels || !parsed.accessories) {
+        setGlobalError("Ongeldig productbestand.");
+        return;
+      }
+      setProductLibrary(parsed);
+      setGlobalInfo("Productdata geïmporteerd.");
+      setGlobalError("");
     } catch (error) {
       console.error(error);
-      setGlobalError("Er ging iets mis bij de visualisatie. Probeer het opnieuw.");
-    } finally {
-      setIsSubmitting(false);
+      setGlobalError("Kon productdata niet importeren.");
     }
+  };
+
+  const toggleProductActive = (id: string, type: "panels" | "accessories") => {
+    setProductLibrary((prev) => ({
+      ...prev,
+      [type]: prev[type].map((item) =>
+        item.id === id ? { ...item, active: !item.active } : item
+      ),
+    }));
+  };
+
+  const deleteProduct = (id: string, type: "panels" | "accessories") => {
+    setProductLibrary((prev) => ({
+      ...prev,
+      [type]: prev[type].filter((item) => item.id !== id),
+    }));
   };
 
   return (
     <main className="min-h-screen bg-gray-50 text-black">
-      <div className="mx-auto max-w-5xl space-y-6 p-4 pb-28 md:p-6">
+      <div className="mx-auto max-w-6xl space-y-6 p-4 pb-28 md:p-6">
         <section className="rounded-2xl border border-gray-200 bg-white p-4 text-center shadow-sm md:p-6">
-          <h1 className="text-3xl font-bold tracking-tight text-black">GevelPlanner</h1>
-          <p className="mt-2 text-base font-medium text-gray-700">
-            Bereken je gevel in 2 minuten
-          </p>
-          <p className="mt-3 text-sm leading-6 text-gray-600">
-            Minder invoeren, sneller resultaat. Gegevens worden automatisch lokaal opgeslagen zodat je later verder kunt.
+          <h1 className="text-3xl font-bold tracking-tight">GevelPlanner v3.0</h1>
+          <p className="mt-2 text-gray-700">
+            Productgedreven calculatie voor Spänl panelen, profielen en onderconstructie.
           </p>
         </section>
 
         <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <h2 className="text-lg font-semibold text-black">Werkwijze</h2>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setCurrentStep("surface")}
+              className={`rounded-xl px-4 py-2 text-sm font-medium ${
+                currentStep === "surface" ? "bg-black text-white" : "border border-gray-300 bg-white"
+              }`}
+            >
+              Stap 1 – Zijdes
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentStep("material")}
+              className={`rounded-xl px-4 py-2 text-sm font-medium ${
+                currentStep === "material" ? "bg-black text-white" : "border border-gray-300 bg-white"
+              }`}
+            >
+              Stap 2 – Producten
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentStep("result")}
+              className={`rounded-xl px-4 py-2 text-sm font-medium ${
+                currentStep === "result" ? "bg-black text-white" : "border border-gray-300 bg-white"
+              }`}
+            >
+              Stap 3 – Resultaat
+            </button>
             <button
               type="button"
               onClick={resetSavedData}
-              className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-gray-50"
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium"
             >
               Reset opgeslagen gegevens
             </button>
           </div>
-
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => setInputMode("quick")}
-              className={`rounded-2xl border p-4 text-left transition ${
-                inputMode === "quick"
-                  ? "border-black bg-gray-50"
-                  : "border-gray-200 bg-white hover:bg-gray-50"
-              }`}
-            >
-              <div className="font-semibold">Snel invullen</div>
-              <div className="mt-1 text-sm text-gray-600">
-                Aanbevolen. Gebruik aantal kozijnen en gemiddelde groottes.
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setInputMode("advanced")}
-              className={`rounded-2xl border p-4 text-left transition ${
-                inputMode === "advanced"
-                  ? "border-black bg-gray-50"
-                  : "border-gray-200 bg-white hover:bg-gray-50"
-              }`}
-            >
-              <div className="font-semibold">Geavanceerd</div>
-              <div className="mt-1 text-sm text-gray-600">
-                Gebruik AI of vul ramen en deuren handmatig per zijde in.
-              </div>
-            </button>
-          </div>
         </section>
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-800">
-                Aantal zijdes
-              </label>
-              <select
-                className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
-                value={sideCount}
-                onChange={(e) => resetSidesByCount(Number(e.target.value))}
-              >
-                {Array.from({ length: MAX_SIDES }, (_, i) => i + 1).map((count) => (
-                  <option key={count} value={count}>
-                    {count}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {sideCount >= 2 ? (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-800">
-                  Zijn voor- en achterkant gelijk?
-                </label>
-                <select
-                  className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
-                  value={frontBackEqual === null ? "unknown" : frontBackEqual ? "yes" : "no"}
-                  onChange={(e) => setFrontBackEqual(e.target.value === "yes")}
-                >
-                  <option value="yes">Ja, koppel automatisch</option>
-                  <option value="no">Nee, apart invullen</option>
-                </select>
-              </div>
-            ) : null}
-
-            {sideCount >= 4 ? (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-800">
-                  Zijn linker- en rechterkant gelijk?
-                </label>
-                <select
-                  className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
-                  value={leftRightEqual === null ? "unknown" : leftRightEqual ? "yes" : "no"}
-                  onChange={(e) => setLeftRightEqual(e.target.value === "yes")}
-                >
-                  <option value="yes">Ja, koppel automatisch</option>
-                  <option value="no">Nee, apart invullen</option>
-                </select>
-              </div>
-            ) : null}
-          </div>
-
-          <p className="mt-3 text-sm text-gray-600">
-            Alleen de afmetingen worden gekoppeld. Ramen en deuren blijven altijd per zijde apart.
-          </p>
-        </section>
-
-        {sides.map((side, index) => {
-          const { source, isAuto } = getSourceSide(
-            side,
-            index,
-            sides,
-            frontBackEqual,
-            leftRightEqual
-          );
-
-          const isLinked = !!source;
-          const resolvedWidth = getResolvedWidth(side, index);
-          const resolvedHeight = getResolvedHeight(side, index);
-          const aiCanRun =
-            !!side.photo && resolvedWidth.trim() !== "" && resolvedHeight.trim() !== "";
-
-          const manualLinkOptions = sides.filter(
-            (s, optionIndex) => s.id !== side.id && optionIndex < index
-          );
-
-          return (
-            <section
-              key={side.id}
-              className="space-y-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-6"
-            >
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        {currentStep === "surface" && (
+          <>
+            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="grid gap-4 md:grid-cols-3">
                 <div>
-                  <h2 className="text-xl font-semibold text-black">{side.name}</h2>
-                  <p className="text-sm text-gray-600">
-                    Geef de afmetingen en kies hoe je met ramen en deuren op deze zijde wilt omgaan.
-                  </p>
-                </div>
-
-                {sides.length > 1 ? (
-                  <button
-                    type="button"
-                    className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-gray-50"
-                    onClick={() => removeSide(side.id)}
-                  >
-                    Verwijder zijde
-                  </button>
-                ) : null}
-              </div>
-
-              {isAuto ? (
-                <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-                  Automatisch gekoppeld aan {source?.name}.
-                </div>
-              ) : (
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-800">
-                    Neem afmetingen over van zijde
-                  </label>
+                  <label className="mb-1 block text-sm font-medium">Aantal zijdes</label>
                   <select
-                    className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
-                    value={side.linkToSideId || ""}
-                    onChange={(e) => handleManualLinkChange(side.id, e.target.value)}
+                    className="w-full rounded-xl border border-gray-300 p-3"
+                    value={sideCount}
+                    onChange={(e) => resetSidesByCount(Number(e.target.value))}
                   >
-                    <option value="">Handmatig invullen</option>
-                    {manualLinkOptions.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
+                    {Array.from({ length: MAX_SIDES }, (_, i) => i + 1).map((count) => (
+                      <option key={count} value={count}>
+                        {count}
                       </option>
                     ))}
                   </select>
-
-                  {!isAuto && side.linkToSideId && source ? (
-                    <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-                      Afmetingen worden overgenomen van {source.name}.
-                    </div>
-                  ) : null}
-                </div>
-              )}
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-800">
-                    Breedte zijde (cm)
-                  </label>
-                  <input
-                    className={`w-full rounded-xl border border-gray-300 p-3 text-black outline-none transition focus:border-black ${
-                      isLinked ? "bg-gray-100" : "bg-white"
-                    }`}
-                    inputMode="numeric"
-                    value={resolvedWidth}
-                    onChange={(e) => setSideField(side.id, "width", e.target.value)}
-                    placeholder="Bijv. 540"
-                    disabled={isLinked}
-                  />
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-800">
-                    Hoogte zijde (cm)
-                  </label>
-                  <input
-                    className={`w-full rounded-xl border border-gray-300 p-3 text-black outline-none transition focus:border-black ${
-                      isLinked ? "bg-gray-100" : "bg-white"
-                    }`}
-                    inputMode="numeric"
-                    value={resolvedHeight}
-                    onChange={(e) => setSideField(side.id, "height", e.target.value)}
-                    placeholder="Bijv. 280"
-                    disabled={isLinked}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <p className="mb-2 text-sm font-medium text-gray-800">
-                    Afbeelding voor deze zijde
-                  </p>
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <button
-                      type="button"
-                      className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50"
-                      onClick={() => cameraInputRefs.current[side.id]?.click()}
+                {sideCount >= 2 && (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Zijn voor- en achterkant gelijk?</label>
+                    <select
+                      className="w-full rounded-xl border border-gray-300 p-3"
+                      value={frontBackEqual ? "yes" : "no"}
+                      onChange={(e) => setFrontBackEqual(e.target.value === "yes")}
                     >
-                      {side.previewUrl ? "Vervang foto" : "Maak foto"}
-                    </button>
+                      <option value="yes">Ja</option>
+                      <option value="no">Nee</option>
+                    </select>
+                  </div>
+                )}
 
-                    <button
-                      type="button"
-                      className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50"
-                      onClick={() => fileInputRefs.current[side.id]?.click()}
+                {sideCount >= 4 && (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Zijn linker- en rechterkant gelijk?</label>
+                    <select
+                      className="w-full rounded-xl border border-gray-300 p-3"
+                      value={leftRightEqual ? "yes" : "no"}
+                      onChange={(e) => setLeftRightEqual(e.target.value === "yes")}
                     >
-                      {side.previewUrl ? "Kies ander bestand" : "Kies bestand"}
-                    </button>
-                  </div>
-                </div>
-
-                <input
-                  ref={(el) => {
-                    cameraInputRefs.current[side.id] = el;
-                  }}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => handleFileChange(side.id, e)}
-                />
-
-                <input
-                  ref={(el) => {
-                    fileInputRefs.current[side.id] = el;
-                  }}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => handleFileChange(side.id, e)}
-                />
-
-                {side.previewUrl ? (
-                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
-                    <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-sm font-medium text-gray-800">Preview {side.name}</p>
-                      <div className="text-sm font-medium text-green-700">
-                        Foto toegevoegd{side.photo?.name ? `: ${side.photo.name}` : ""}
-                      </div>
-                    </div>
-                    <img
-                      src={side.previewUrl}
-                      alt={`Preview van ${side.name}`}
-                      className="max-h-[360px] w-full rounded-xl object-contain"
-                    />
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-500">
-                    Nog geen afbeelding gekozen voor {side.name.toLowerCase()}.
+                      <option value="yes">Ja</option>
+                      <option value="no">Nee</option>
+                    </select>
                   </div>
                 )}
               </div>
+            </section>
 
-              {inputMode === "advanced" ? (
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-gray-800">
-                    Ramen en deuren op deze zijde
-                  </p>
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                    {(["none", "ai", "manual", "estimate", "skip"] as OpeningMode[]).map(
-                      (mode) => {
-                        const checked = side.openingMode === mode;
-                        return (
-                          <label
-                            key={mode}
-                            className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition ${
-                              checked
-                                ? "border-black bg-gray-50"
-                                : "border-gray-200 bg-white hover:bg-gray-50"
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name={`opening-mode-${side.id}`}
-                              checked={checked}
-                              onChange={() => handleOpeningModeChange(side.id, mode)}
-                            />
-                            <span className="text-sm font-medium text-black">
-                              {openingModeLabels[mode]}
-                            </span>
-                          </label>
-                        );
-                      }
-                    )}
-                  </div>
-                </div>
-              ) : null}
+            {sides.map((side, index) => {
+              const { source, isAuto } = getSourceSide(side, index, sides, frontBackEqual, leftRightEqual);
+              const isLinked = !!source;
+              const widthValue = getResolvedWidth(side, index);
+              const heightValue = getResolvedHeight(side, index);
 
-              {(inputMode === "quick" || side.openingMode === "estimate") && (
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <div>
-                    <h3 className="font-semibold text-black">Gemiddelde inschatting</h3>
-                    <p className="text-sm text-gray-600">
-                      Vul het aantal kozijnen en de gemiddelde grootte in. Dit is de snelste manier.
-                    </p>
+              const manualLinkOptions = sides.filter((s, optionIndex) => s.id !== side.id && optionIndex < index);
+
+              return (
+                <section key={side.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold">{side.name}</h2>
                   </div>
+
+                  {isAuto ? (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                      Automatisch gekoppeld aan {source?.name}
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Neem afmetingen over van zijde</label>
+                      <select
+                        className="w-full rounded-xl border border-gray-300 p-3"
+                        value={side.linkToSideId || ""}
+                        onChange={(e) => handleManualLinkChange(side.id, e.target.value)}
+                      >
+                        <option value="">Handmatig invullen</option>
+                        {manualLinkOptions.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-800">
-                        Aantal kozijnen (ramen + deuren)
-                      </label>
+                      <label className="mb-1 block text-sm font-medium">Breedte (cm)</label>
                       <input
-                        className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
-                        inputMode="numeric"
-                        value={side.frameCount}
-                        onChange={(e) => setSideField(side.id, "frameCount", e.target.value)}
-                        placeholder="Bijv. 8"
+                        className={`w-full rounded-xl border border-gray-300 p-3 ${isLinked ? "bg-gray-100" : ""}`}
+                        value={widthValue}
+                        disabled={isLinked}
+                        onChange={(e) => setSideField(side.id, "width", e.target.value)}
                       />
                     </div>
-
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-800">
-                        Gemiddelde grootte kozijnen
-                      </label>
-                      <select
-                        className="w-full rounded-xl border border-gray-300 bg-white p-3 text-black outline-none transition focus:border-black"
-                        value={side.frameSizeType}
-                        onChange={(e) =>
-                          setSideField(side.id, "frameSizeType", e.target.value as FrameSizeType)
-                        }
-                      >
-                        <option value="small">
-                          Klein – gemiddeld 1,0 m² per kozijn
-                        </option>
-                        <option value="medium">
-                          Gemiddeld – gemiddeld 1,6 m² per kozijn
-                        </option>
-                        <option value="large">
-                          Groot – gemiddeld 2,5 m² per kozijn
-                        </option>
-                      </select>
+                      <label className="mb-1 block text-sm font-medium">Hoogte (cm)</label>
+                      <input
+                        className={`w-full rounded-xl border border-gray-300 p-3 ${isLinked ? "bg-gray-100" : ""}`}
+                        value={heightValue}
+                        disabled={isLinked}
+                        onChange={(e) => setSideField(side.id, "height", e.target.value)}
+                      />
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-700">
-                    Geschatte aftrek:{" "}
-                    <strong>{getEstimatedDeductionM2(side).toFixed(2)} m²</strong>
-                  </div>
-                </div>
-              )}
-
-              {inputMode === "advanced" && side.openingMode === "ai" ? (
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <h3 className="font-semibold text-black">
-                        AI-inschatting ramen en deuren
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        AI gebruikt de foto en de ingevulde breedte en hoogte van deze zijde als schaal voor een eerste schatting.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="rounded-xl border border-gray-300 bg-white px-4 py-2 font-medium text-black transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={() => estimateOpeningsWithAi(side, index)}
-                      disabled={aiLoadingSideId === side.id || !aiCanRun}
-                    >
-                      {aiLoadingSideId === side.id ? "AI analyseert..." : "Analyseer foto"}
-                    </button>
-                  </div>
-
-                  {!aiCanRun ? (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                      Vul eerst breedte, hoogte en een foto in om AI te gebruiken.
-                    </div>
-                  ) : null}
-
-                  {side.aiDetectedCount !== null ? (
-                    <div className="rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-700">
-                      AI heeft {side.aiDetectedCount} raam/deur-openingen gevonden.
-                    </div>
-                  ) : null}
-
-                  {side.openings.length > 0 ? (
-                    <div className="space-y-3">
-                      {side.openings.map((opening, openingIndex) => (
-                        <div
-                          key={opening.id}
-                          className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4"
-                        >
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-medium text-black">
-                              Voorgestelde opening {openingIndex + 1}
-                            </h4>
-                            <button
-                              type="button"
-                              className="text-sm text-gray-700 underline"
-                              onClick={() => removeOpening(side.id, opening.id)}
-                            >
-                              Verwijderen
-                            </button>
-                          </div>
-
-                          <div className="grid gap-3 md:grid-cols-4">
-                            <div>
-                              <label className="mb-1 block text-sm text-gray-700">Type</label>
-                              <select
-                                className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
-                                value={opening.type}
-                                onChange={(e) =>
-                                  updateOpening(
-                                    side.id,
-                                    opening.id,
-                                    "type",
-                                    e.target.value as OpeningType
-                                  )
-                                }
-                              >
-                                <option value="window">Raam</option>
-                                <option value="door">Deur</option>
-                                <option value="other">Overig</option>
-                              </select>
-                            </div>
-
-                            <div>
-                              <label className="mb-1 block text-sm text-gray-700">
-                                Breedte (cm)
-                              </label>
-                              <input
-                                className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
-                                inputMode="numeric"
-                                value={opening.width}
-                                onChange={(e) =>
-                                  updateOpening(side.id, opening.id, "width", e.target.value)
-                                }
-                              />
-                            </div>
-
-                            <div>
-                              <label className="mb-1 block text-sm text-gray-700">
-                                Hoogte (cm)
-                              </label>
-                              <input
-                                className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
-                                inputMode="numeric"
-                                value={opening.height}
-                                onChange={(e) =>
-                                  updateOpening(side.id, opening.id, "height", e.target.value)
-                                }
-                              />
-                            </div>
-
-                            <div>
-                              <label className="mb-1 block text-sm text-gray-700">Aantal</label>
-                              <input
-                                className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
-                                inputMode="numeric"
-                                value={opening.count}
-                                onChange={(e) =>
-                                  updateOpening(side.id, opening.id, "count", e.target.value)
-                                }
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Foto van deze zijde</label>
+                    <div className="flex flex-col gap-3 sm:flex-row">
                       <button
                         type="button"
-                        className="rounded-xl border border-gray-300 bg-white px-4 py-2 font-medium text-black transition hover:bg-gray-50"
-                        onClick={() => addOpening(side.id)}
+                        className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium"
+                        onClick={() => cameraInputRefs.current[side.id]?.click()}
                       >
-                        Opening toevoegen
+                        Maak foto
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium"
+                        onClick={() => fileInputRefs.current[side.id]?.click()}
+                      >
+                        Kies bestand
                       </button>
                     </div>
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-500">
-                      Nog geen AI-resultaten voor deze zijde.
-                    </div>
-                  )}
-                </div>
-              ) : null}
 
-              {inputMode === "advanced" && side.openingMode === "manual" ? (
-                <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                  <div>
-                    <h3 className="font-semibold text-black">Handmatige invoer</h3>
-                    <p className="text-sm text-gray-600">
-                      Voeg alleen de ramen, deuren of andere openingen toe die op deze zijde aanwezig zijn.
-                    </p>
+                    <input
+                      ref={(el) => {
+                        cameraInputRefs.current[side.id] = el;
+                      }}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) => handleFileChange(side.id, e)}
+                    />
+
+                    <input
+                      ref={(el) => {
+                        fileInputRefs.current[side.id] = el;
+                      }}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleFileChange(side.id, e)}
+                    />
+
+                    {side.previewUrl && (
+                      <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                        <img
+                          src={side.previewUrl}
+                          alt={side.name}
+                          className="max-h-[320px] w-full rounded-xl object-contain"
+                        />
+                      </div>
+                    )}
                   </div>
 
-                  {side.openings.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-500">
-                      Nog geen ramen of deuren toegevoegd.
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                    <h3 className="font-semibold">Snel invullen</h3>
+                    <div className="mt-3">
+                      <label className="mb-1 block text-sm font-medium">Deuren / kozijnen</label>
+                      <select
+                        className="w-full rounded-xl border border-gray-300 p-3"
+                        value={side.openingMode === "none" ? "none" : "estimate"}
+                        onChange={(e) =>
+                          handleOpeningModeChange(side.id, e.target.value === "none" ? "none" : "estimate")
+                        }
+                      >
+                        <option value="estimate">Gemiddeld inschatten</option>
+                        <option value="none">Geen deuren/kozijnen</option>
+                      </select>
                     </div>
-                  ) : null}
 
-                  {side.openings.map((opening, openingIndex) => (
-                    <div
-                      key={opening.id}
-                      className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-black">
-                          Opening {openingIndex + 1}
-                        </h4>
-                        <button
-                          type="button"
-                          className="text-sm text-gray-700 underline"
-                          onClick={() => removeOpening(side.id, opening.id)}
-                        >
-                          Verwijderen
-                        </button>
-                      </div>
-
-                      <div className="grid gap-3 md:grid-cols-4">
+                    {side.openingMode !== "none" && (
+                      <div className="mt-4 grid gap-4 md:grid-cols-2">
                         <div>
-                          <label className="mb-1 block text-sm text-gray-700">Type</label>
+                          <label className="mb-1 block text-sm font-medium">Aantal kozijnen</label>
+                          <input
+                            className="w-full rounded-xl border border-gray-300 p-3"
+                            value={side.frameCount}
+                            onChange={(e) => setSideField(side.id, "frameCount", e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium">Gemiddelde grootte</label>
                           <select
-                            className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
-                            value={opening.type}
+                            className="w-full rounded-xl border border-gray-300 p-3"
+                            value={side.frameSizeType}
                             onChange={(e) =>
-                              updateOpening(
-                                side.id,
-                                opening.id,
-                                "type",
-                                e.target.value as OpeningType
-                              )
+                              setSideField(side.id, "frameSizeType", e.target.value as FrameSizeType)
                             }
                           >
-                            <option value="window">Raam</option>
-                            <option value="door">Deur</option>
-                            <option value="other">Overig</option>
+                            <option value="small">Klein</option>
+                            <option value="medium">Gemiddeld</option>
+                            <option value="large">Groot</option>
                           </select>
                         </div>
-
-                        <div>
-                          <label className="mb-1 block text-sm text-gray-700">Breedte (cm)</label>
-                          <input
-                            className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
-                            inputMode="numeric"
-                            value={opening.width}
-                            onChange={(e) =>
-                              updateOpening(side.id, opening.id, "width", e.target.value)
-                            }
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block text-sm text-gray-700">Hoogte (cm)</label>
-                          <input
-                            className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
-                            inputMode="numeric"
-                            value={opening.height}
-                            onChange={(e) =>
-                              updateOpening(side.id, opening.id, "height", e.target.value)
-                            }
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block text-sm text-gray-700">Aantal</label>
-                          <input
-                            className="w-full rounded-xl border border-gray-300 bg-white p-2 text-black outline-none transition focus:border-black"
-                            inputMode="numeric"
-                            value={opening.count}
-                            onChange={(e) =>
-                              updateOpening(side.id, opening.id, "count", e.target.value)
-                            }
-                          />
-                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )}
+                  </div>
 
-                  <button
-                    type="button"
-                    className="rounded-xl border border-gray-300 bg-white px-4 py-2 font-medium text-black transition hover:bg-gray-50"
-                    onClick={() => addOpening(side.id)}
-                  >
-                    Raam / deur toevoegen
-                  </button>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <div className="text-sm text-gray-500">Bruto</div>
+                      <div className="mt-1 text-lg font-semibold">{getGrossAreaM2(side, index).toFixed(2)} m²</div>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <div className="text-sm text-gray-500">Aftrek</div>
+                      <div className="mt-1 text-lg font-semibold">{getOpeningAreaM2(side).toFixed(2)} m²</div>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <div className="text-sm text-gray-500">Netto</div>
+                      <div className="mt-1 text-lg font-semibold">{getNetAreaM2(side, index).toFixed(2)} m²</div>
+                    </div>
+                  </div>
+                </section>
+              );
+            })}
+
+            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                  <div className="text-sm text-gray-500">Totaal bruto</div>
+                  <div className="mt-1 text-lg font-semibold">{totals.gross.toFixed(2)} m²</div>
                 </div>
-              ) : null}
-
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <div className="mb-2 text-sm font-semibold text-gray-800">
-                  Berekening zijde
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                  <div className="text-sm text-gray-500">Totaal aftrek</div>
+                  <div className="mt-1 text-lg font-semibold">{totals.opening.toFixed(2)} m²</div>
                 </div>
-                <div className="grid gap-2 text-sm text-gray-700 md:grid-cols-3">
-                  <div className="rounded-xl bg-white p-3">
-                    <div className="text-gray-500">Bruto oppervlak</div>
-                    <div className="mt-1 font-semibold">
-                      {getGrossAreaM2(side, index).toFixed(2)} m²
-                    </div>
-                  </div>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                  <div className="text-sm text-gray-500">Totaal netto</div>
+                  <div className="mt-1 text-lg font-semibold">{totals.net.toFixed(2)} m²</div>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
 
-                  <div className="rounded-xl bg-white p-3">
-                    <div className="text-gray-500">Aftrek ramen/deuren</div>
-                    <div className="mt-1 font-semibold">
-                      {getOpeningAreaM2(side).toFixed(2)} m²
-                    </div>
-                  </div>
+        {currentStep === "material" && (
+          <>
+            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <h2 className="text-xl font-semibold">Productbibliotheek</h2>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <label className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium cursor-pointer">
+                  Import productdata (.json)
+                  <input type="file" accept="application/json" className="hidden" onChange={handleImportProducts} />
+                </label>
+                <button
+                  type="button"
+                  className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium"
+                  onClick={() => downloadJson("spanl-productdata-v3.json", productLibrary)}
+                >
+                  Exporteer productdata
+                </button>
+              </div>
+            </section>
 
-                  <div className="rounded-xl bg-white p-3">
-                    <div className="text-gray-500">Netto oppervlak</div>
-                    <div className="mt-1 font-semibold">
-                      {getNetAreaM2(side, index).toFixed(2)} m²
-                    </div>
-                  </div>
+            <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <h3 className="text-lg font-semibold">Calculatie-instellingen</h3>
+              <div className="mt-4 grid gap-4 md:grid-cols-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Korting (%)</label>
+                  <input
+                    className="w-full rounded-xl border border-gray-300 p-3"
+                    value={materialConfig.discountPercent}
+                    onChange={(e) =>
+                      setMaterialConfig((prev) => ({ ...prev, discountPercent: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Zaagverlies (%)</label>
+                  <input
+                    className="w-full rounded-xl border border-gray-300 p-3"
+                    value={materialConfig.wastePercent}
+                    onChange={(e) =>
+                      setMaterialConfig((prev) => ({ ...prev, wastePercent: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Buitenhoeken</label>
+                  <input
+                    className="w-full rounded-xl border border-gray-300 p-3"
+                    value={materialConfig.outsideCorners}
+                    onChange={(e) =>
+                      setMaterialConfig((prev) => ({ ...prev, outsideCorners: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Binnenhoeken</label>
+                  <input
+                    className="w-full rounded-xl border border-gray-300 p-3"
+                    value={materialConfig.insideCorners}
+                    onChange={(e) =>
+                      setMaterialConfig((prev) => ({ ...prev, insideCorners: e.target.value }))
+                    }
+                  />
                 </div>
               </div>
 
-              {side.error ? (
-                <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
-                  {side.error}
-                </div>
-              ) : null}
+              <div className="mt-4 max-w-xs">
+                <label className="mb-1 block text-sm font-medium">Rail afstand h.o.h. (cm)</label>
+                <input
+                  className="w-full rounded-xl border border-gray-300 p-3"
+                  value={materialConfig.railSpacingCm}
+                  onChange={(e) =>
+                    setMaterialConfig((prev) => ({ ...prev, railSpacingCm: e.target.value }))
+                  }
+                />
+              </div>
             </section>
-          );
-        })}
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <h3 className="mb-3 text-lg font-semibold text-black">Totaaloverzicht</h3>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
-              <div className="text-sm text-gray-500">Totaal bruto</div>
-              <div className="mt-1 text-lg font-semibold">{totals.gross.toFixed(2)} m²</div>
-            </div>
+            <section className="grid gap-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <h3 className="text-lg font-semibold">Panelen</h3>
+                <div className="mt-4 space-y-3">
+                  {productLibrary.panels.map((item) => (
+                    <div key={item.id} className="rounded-xl border border-gray-200 p-3">
+                      <div className="font-semibold">{item.name}</div>
+                      <div className="text-sm text-gray-600">
+                        {item.sku} • {item.lengthMm} mm • {item.workHeightMm ?? "-"} mm werkhoogte • €{" "}
+                        {item.priceExVat.toFixed(2)}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleProductActive(item.id, "panels")}
+                          className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                        >
+                          {item.active ? "Actief" : "Inactief"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteProduct(item.id, "panels")}
+                          className="rounded-xl border border-red-300 px-3 py-2 text-sm text-red-700"
+                        >
+                          Verwijder niet-courant product
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
-              <div className="text-sm text-gray-500">Totaal aftrek</div>
-              <div className="mt-1 text-lg font-semibold">{totals.opening.toFixed(2)} m²</div>
-            </div>
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <h3 className="text-lg font-semibold">Accessoires</h3>
+                <div className="mt-4 space-y-3">
+                  {productLibrary.accessories.map((item) => (
+                    <div key={item.id} className="rounded-xl border border-gray-200 p-3">
+                      <div className="font-semibold">{item.name}</div>
+                      <div className="text-sm text-gray-600">
+                        {item.sku} • {item.lengthMm} mm • € {item.priceExVat.toFixed(2)}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleProductActive(item.id, "accessories")}
+                          className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                        >
+                          {item.active ? "Actief" : "Inactief"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteProduct(item.id, "accessories")}
+                          className="rounded-xl border border-red-300 px-3 py-2 text-sm text-red-700"
+                        >
+                          Verwijder niet-courant product
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </>
+        )}
 
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
-              <div className="text-sm text-gray-500">Totaal netto</div>
-              <div className="mt-1 text-lg font-semibold">{totals.net.toFixed(2)} m²</div>
-            </div>
-          </div>
-        </section>
+        {currentStep === "result" && (
+          <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <h2 className="text-xl font-semibold">Resultaat v3.0</h2>
 
-        {globalInfo ? (
+            {!result ? (
+              <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3 text-red-700">
+                Niet alle actieve producten zijn beschikbaar. Controleer de productbibliotheek.
+              </div>
+            ) : (
+              <>
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <div className="text-sm text-gray-500">Panelen bruto</div>
+                    <div className="mt-1 text-lg font-semibold">{result.panelCount}</div>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <div className="text-sm text-gray-500">Panelen incl. zaagverlies</div>
+                    <div className="mt-1 text-lg font-semibold">{result.panelCountWithWaste}</div>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <div className="text-sm text-gray-500">Netto oppervlak</div>
+                    <div className="mt-1 text-lg font-semibold">{totals.net.toFixed(2)} m²</div>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <div className="text-sm text-gray-500">Korting</div>
+                    <div className="mt-1 text-lg font-semibold">{materialConfig.discountPercent}%</div>
+                  </div>
+                </div>
+
+                <div className="mt-6 overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-left">
+                        <th className="p-3">Onderdeel</th>
+                        <th className="p-3">Aantal</th>
+                        <th className="p-3">Kosten</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-gray-100">
+                        <td className="p-3">Panelen</td>
+                        <td className="p-3">{result.panelCountWithWaste}</td>
+                        <td className="p-3">€ {result.panelCost.toFixed(2)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="p-3">Startersprofielen</td>
+                        <td className="p-3">{result.starterCount}</td>
+                        <td className="p-3">€ {result.starterCost.toFixed(2)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="p-3">Eindprofielen</td>
+                        <td className="p-3">{result.endCount}</td>
+                        <td className="p-3">€ {result.endCost.toFixed(2)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="p-3">Buitenhoeken</td>
+                        <td className="p-3">{result.outsideCornerPieces}</td>
+                        <td className="p-3">€ {result.outsideCornerCost.toFixed(2)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="p-3">Binnenhoeken</td>
+                        <td className="p-3">{result.insideCornerPieces}</td>
+                        <td className="p-3">€ {result.insideCornerCost.toFixed(2)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="p-3">PJDZ basisprofielen</td>
+                        <td className="p-3">{result.connectionBaseCount}</td>
+                        <td className="p-3">€ {result.connectionBaseCost.toFixed(2)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="p-3">PJ01 zichtprofielen</td>
+                        <td className="p-3">{result.connectionVisibleCount}</td>
+                        <td className="p-3">€ {result.connectionVisibleCost.toFixed(2)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-100">
+                        <td className="p-3">Rails / onderconstructie</td>
+                        <td className="p-3">
+                          {result.railPieceCount} stuks ({result.totalRailMeters.toFixed(2)} m)
+                        </td>
+                        <td className="p-3">€ {result.railCost.toFixed(2)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-6 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="text-sm text-gray-500">Subtotaal</div>
+                    <div className="mt-1 text-2xl font-semibold">€ {result.subtotal.toFixed(2)}</div>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="text-sm text-gray-500">Totaal na korting</div>
+                    <div className="mt-1 text-2xl font-semibold">€ {result.totalAfterDiscount.toFixed(2)}</div>
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
+        {globalInfo && (
           <section className="rounded-xl border border-green-300 bg-green-50 p-3 text-sm text-green-700">
             {globalInfo}
           </section>
-        ) : null}
+        )}
 
-        {globalError ? (
+        {globalError && (
           <section className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
             {globalError}
           </section>
-        ) : null}
-
-        <section className="rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm">
-          Alleen de afmetingen worden gekoppeld. Ramen en deuren worden altijd per zijde apart verwerkt.
-          Ingevulde gegevens blijven lokaal bewaard totdat je ze reset.
-        </section>
+        )}
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 p-4 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row">
-          <button
-            type="button"
-            className="rounded-xl border border-gray-300 bg-white px-4 py-3 font-medium text-black transition hover:bg-gray-50 disabled:opacity-50"
-            onClick={addSide}
-            disabled={sides.length >= MAX_SIDES}
-          >
-            Zijde toevoegen
-          </button>
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row">
+          {currentStep === "surface" && (
+            <button
+              type="button"
+              className="rounded-xl bg-black px-5 py-3 font-semibold text-white disabled:opacity-50"
+              onClick={() => {
+                if (!canGoToMaterial) {
+                  setGlobalError("Vul minimaal één zijde compleet in.");
+                  return;
+                }
+                setCurrentStep("material");
+                setGlobalError("");
+              }}
+            >
+              ➡️ Ga naar producten
+            </button>
+          )}
 
-          <button
-            type="button"
-            className="rounded-xl bg-black px-5 py-3 font-semibold text-white disabled:opacity-50"
-            onClick={handleContinue}
-            disabled={!canContinue || isSubmitting}
-          >
-            {isSubmitting ? "Bezig..." : "Bereken resultaat"}
-          </button>
+          {currentStep === "material" && (
+            <button
+              type="button"
+              className="rounded-xl bg-black px-5 py-3 font-semibold text-white"
+              onClick={() => {
+                setCurrentStep("result");
+                setGlobalError("");
+              }}
+            >
+              ➡️ Bereken v3.0 resultaat
+            </button>
+          )}
+
+          {currentStep === "result" && (
+            <button
+              type="button"
+              className="rounded-xl border border-gray-300 bg-white px-5 py-3 font-semibold"
+              onClick={() => setCurrentStep("material")}
+            >
+              ⬅️ Terug naar producten
+            </button>
+          )}
         </div>
       </div>
     </main>
