@@ -1,344 +1,246 @@
 "use client";
 
-import { useState, useRef, ChangeEvent } from "react";
+import { useState } from "react";
 
-/* =========================
-   TYPES
-========================= */
-type Orientation = "vertical" | "horizontal";
-type OpeningType = "window" | "door";
-
-type OpeningGroup = {
+type Opening = {
   id: string;
-  type: OpeningType;
-  width: string;
-  height: string;
-  count: string;
-  presetKey: string;
+  type: "window" | "door";
+  width: number;
+  height: number;
+  count: number;
 };
 
 type Side = {
-  id: string;
   name: string;
-  width: string;
-  height: string;
-  image: File | null;
-  preview: string;
-  orientation: Orientation;
-  openings: OpeningGroup[];
+  width: number;
+  height: number;
+  before?: string;
+  after?: string;
+  openings: Opening[];
+  orientation: "vertical" | "horizontal";
 };
 
-/* =========================
-   PRESETS (EU)
-========================= */
-const DOOR_PRESETS: Record<string, { label: string; width: number; height: number }> = {
-  d1: { label: "900 x 2100 (standaard)", width: 90, height: 210 },
-  d2: { label: "830 x 2015", width: 83, height: 201.5 },
+const presets = {
+  windows: [
+    { label: "Custom", w: 0, h: 0 },
+    { label: "100 x 100", w: 100, h: 100 },
+    { label: "120 x 100", w: 120, h: 100 },
+    { label: "140 x 120", w: 140, h: 120 },
+  ],
+  doors: [
+    { label: "Custom", w: 0, h: 0 },
+    { label: "88 x 211", w: 88, h: 211 },
+    { label: "93 x 231", w: 93, h: 231 },
+  ],
 };
 
-const WINDOW_PRESETS: Record<string, { label: string; width: number; height: number }> = {
-  w1: { label: "1200 x 1200", width: 120, height: 120 },
-  w2: { label: "1000 x 1000", width: 100, height: 100 },
-};
-
-/* =========================
-   HELPERS
-========================= */
-const toNum = (v: string) => Number(v.replace(",", ".")) || 0;
-
-const createOpening = (): OpeningGroup => ({
-  id: crypto.randomUUID(),
-  type: "window",
-  width: "",
-  height: "",
-  count: "1",
-  presetKey: "custom",
-});
-
-const createSide = (i: number): Side => ({
-  id: crypto.randomUUID(),
-  name: ["Voor", "Achter", "Links", "Rechts"][i] || `Zijde ${i + 1}`,
-  width: "",
-  height: "",
-  image: null,
-  preview: "",
-  orientation: "horizontal",
-  openings: [],
-});
-
-/* =========================
-   MAIN
-========================= */
-export default function Page() {
-  const [sides, setSides] = useState<Side[]>([
-    createSide(0),
-    createSide(1),
-    createSide(2),
-    createSide(3),
-  ]);
-
-  /* =========================
-     IMAGE
-  ========================= */
-  const handleImage = (sideId: string, file: File | null) => {
-    if (!file) return;
-
-    setSides((prev) =>
-      prev.map((s) =>
-        s.id === sideId
-          ? {
-              ...s,
-              image: file,
-              preview: URL.createObjectURL(file),
-            }
-          : s
-      )
-    );
-  };
-
-  /* =========================
-     OPENINGS
-  ========================= */
-  const addOpening = (sideId: string) => {
-    setSides((prev) =>
-      prev.map((s) =>
-        s.id === sideId ? { ...s, openings: [...s.openings, createOpening()] } : s
-      )
-    );
-  };
-
-  const updateOpening = (
-    sideId: string,
-    openingId: string,
-    field: keyof OpeningGroup,
-    value: string
-  ) => {
-    setSides((prev) =>
-      prev.map((s) =>
-        s.id === sideId
-          ? {
-              ...s,
-              openings: s.openings.map((o) =>
-                o.id === openingId ? { ...o, [field]: value } : o
-              ),
-            }
-          : s
-      )
-    );
-  };
-
-  /* =========================
-     CALC
-  ========================= */
-  const calcOpeningM2 = (side: Side) => {
-    return side.openings.reduce((sum, o) => {
-      const w = toNum(o.width) / 100;
-      const h = toNum(o.height) / 100;
-      const c = toNum(o.count);
-      return sum + w * h * c;
-    }, 0);
-  };
-
-  const calcNet = (side: Side) => {
-    const w = toNum(side.width) / 100;
-    const h = toNum(side.height) / 100;
-    return Math.max(0, w * h - calcOpeningM2(side));
-  };
-
-  /* =========================
-     UI
-  ========================= */
-  return (
-    <main className="p-6 space-y-6 max-w-5xl mx-auto">
-      <h1 className="text-3xl font-bold">Spanl Visualizer</h1>
-
-      {sides.map((side) => (
-        <div key={side.id} className="border p-4 rounded-xl space-y-4">
-          <h2 className="text-xl font-semibold">{side.name}</h2>
-
-          {/* DIMENSIONS */}
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              placeholder="Breedte cm"
-              value={side.width}
-              onChange={(e) =>
-                setSides((prev) =>
-                  prev.map((s) =>
-                    s.id === side.id ? { ...s, width: e.target.value } : s
-                  )
-                )
-              }
-              className="border p-2 rounded"
-            />
-            <input
-              placeholder="Hoogte cm"
-              value={side.height}
-              onChange={(e) =>
-                setSides((prev) =>
-                  prev.map((s) =>
-                    s.id === side.id ? { ...s, height: e.target.value } : s
-                  )
-                )
-              }
-              className="border p-2 rounded"
-            />
-          </div>
-
-          {/* ORIENTATION */}
-          <select
-            value={side.orientation}
-            onChange={(e) =>
-              setSides((prev) =>
-                prev.map((s) =>
-                  s.id === side.id
-                    ? { ...s, orientation: e.target.value as Orientation }
-                    : s
-                )
-              )
-            }
-            className="border p-2 rounded w-full"
-          >
-            <option value="horizontal">Horizontaal</option>
-            <option value="vertical">Verticaal</option>
-          </select>
-
-          {/* IMAGE */}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleImage(side.id, e.target.files?.[0] || null)}
-          />
-
-          {/* BEFORE AFTER */}
-          {side.preview && (
-            <BeforeAfter image={side.preview} orientation={side.orientation} />
-          )}
-
-          {/* OPENINGS */}
-          <div>
-            <button
-              onClick={() => addOpening(side.id)}
-              className="bg-black text-white px-3 py-1 rounded"
-            >
-              + Kozijn/deur
-            </button>
-
-            {side.openings.map((o) => (
-              <div key={o.id} className="border p-3 mt-3 rounded space-y-2">
-                <select
-                  value={o.presetKey}
-                  onChange={(e) => {
-                    const val = e.target.value;
-
-                    if (val === "custom") {
-                      updateOpening(side.id, o.id, "presetKey", "custom");
-                      return;
-                    }
-
-                    const preset =
-                      o.type === "door"
-                        ? DOOR_PRESETS[val]
-                        : WINDOW_PRESETS[val];
-
-                    updateOpening(side.id, o.id, "presetKey", val);
-                    updateOpening(side.id, o.id, "width", String(preset.width));
-                    updateOpening(side.id, o.id, "height", String(preset.height));
-                  }}
-                  className="border p-2 w-full rounded"
-                >
-                  <option value="custom">Custom</option>
-
-                  <optgroup label="Standaard">
-                    {(o.type === "door"
-                      ? Object.entries(DOOR_PRESETS)
-                      : Object.entries(WINDOW_PRESETS)
-                    ).map(([k, p]) => (
-                      <option key={k} value={k}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <input
-                    placeholder="Breedte"
-                    value={o.width}
-                    onChange={(e) =>
-                      updateOpening(side.id, o.id, "width", e.target.value)
-                    }
-                    className="border p-2"
-                  />
-                  <input
-                    placeholder="Hoogte"
-                    value={o.height}
-                    onChange={(e) =>
-                      updateOpening(side.id, o.id, "height", e.target.value)
-                    }
-                    className="border p-2"
-                  />
-                  <input
-                    placeholder="Aantal"
-                    value={o.count}
-                    onChange={(e) =>
-                      updateOpening(side.id, o.id, "count", e.target.value)
-                    }
-                    className="border p-2"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* RESULT */}
-          <div className="bg-gray-100 p-3 rounded">
-            Netto m²: {calcNet(side).toFixed(2)}
-          </div>
-        </div>
-      ))}
-    </main>
+function calcOpeningArea(openings: Opening[]) {
+  return openings.reduce(
+    (sum, o) => sum + (o.width / 100) * (o.height / 100) * o.count,
+    0
   );
 }
 
-/* =========================
-   BEFORE / AFTER COMPONENT
-========================= */
-function BeforeAfter({
-  image,
-  orientation,
-}: {
-  image: string;
-  orientation: Orientation;
-}) {
-  const [slider, setSlider] = useState(50);
-  const ref = useRef<HTMLDivElement>(null);
+function BeforeAfter({ before, after }: { before?: string; after?: string }) {
+  const [pos, setPos] = useState(50);
+
+  if (!before || !after) return null;
 
   return (
-    <div className="relative w-full max-w-xl">
-      <div ref={ref} className="relative overflow-hidden rounded">
-        <img src={image} className="w-full" />
-
-        <div
-          className="absolute top-0 left-0 h-full overflow-hidden"
-          style={{ width: `${slider}%` }}
-        >
-          <img
-            src={image}
-            className={`w-full ${
-              orientation === "vertical" ? "brightness-110 contrast-110" : "sepia"
-            }`}
-          />
-        </div>
+    <div className="relative w-full h-64 rounded-xl overflow-hidden border">
+      <img src={before} className="absolute w-full h-full object-cover" />
+      <div
+        className="absolute top-0 left-0 h-full overflow-hidden"
+        style={{ width: `${pos}%` }}
+      >
+        <img src={after} className="w-full h-full object-cover" />
       </div>
-
       <input
         type="range"
         min={0}
         max={100}
-        value={slider}
-        onChange={(e) => setSlider(Number(e.target.value))}
-        className="w-full mt-2"
+        value={pos}
+        onChange={(e) => setPos(Number(e.target.value))}
+        className="absolute bottom-2 w-full"
       />
     </div>
+  );
+}
+
+export default function Page() {
+  const [sides, setSides] = useState<Side[]>([
+    { name: "Front", width: 0, height: 0, openings: [], orientation: "vertical" },
+    { name: "Back", width: 0, height: 0, openings: [], orientation: "vertical" },
+    { name: "Left", width: 0, height: 0, openings: [], orientation: "vertical" },
+    { name: "Right", width: 0, height: 0, openings: [], orientation: "vertical" },
+  ]);
+
+  const updateSide = (i: number, data: Partial<Side>) => {
+    const copy = [...sides];
+    copy[i] = { ...copy[i], ...data };
+    setSides(copy);
+  };
+
+  const addOpening = (i: number, type: "window" | "door") => {
+    const copy = [...sides];
+    copy[i].openings.push({
+      id: crypto.randomUUID(),
+      type,
+      width: 0,
+      height: 0,
+      count: 1,
+    });
+    setSides(copy);
+  };
+
+  const totals = sides.reduce(
+    (acc, s) => {
+      const gross = (s.width / 100) * (s.height / 100);
+      const open = calcOpeningArea(s.openings);
+      return {
+        gross: acc.gross + gross,
+        open: acc.open + open,
+      };
+    },
+    { gross: 0, open: 0 }
+  );
+
+  const net = totals.gross - totals.open;
+
+  return (
+    <main className="bg-gray-100 min-h-screen p-4">
+      <div className="max-w-7xl mx-auto grid lg:grid-cols-3 gap-6">
+
+        {/* LEFT */}
+        <div className="lg:col-span-2 space-y-6">
+
+          {sides.map((s, i) => (
+            <div key={i} className="bg-white p-4 rounded-xl shadow">
+
+              <h2 className="font-bold text-lg mb-2">{s.name}</h2>
+
+              <div className="grid md:grid-cols-2 gap-3">
+                <input
+                  placeholder="Width (cm)"
+                  className="border p-2 rounded"
+                  onChange={(e) =>
+                    updateSide(i, { width: Number(e.target.value) })
+                  }
+                />
+                <input
+                  placeholder="Height (cm)"
+                  className="border p-2 rounded"
+                  onChange={(e) =>
+                    updateSide(i, { height: Number(e.target.value) })
+                  }
+                />
+              </div>
+
+              {/* orientation */}
+              <div className="mt-3">
+                <select
+                  className="border p-2 rounded w-full"
+                  value={s.orientation}
+                  onChange={(e) =>
+                    updateSide(i, { orientation: e.target.value as any })
+                  }
+                >
+                  <option value="vertical">Vertical</option>
+                  <option value="horizontal">Horizontal</option>
+                </select>
+              </div>
+
+              {/* uploads */}
+              <div className="grid md:grid-cols-2 gap-3 mt-3">
+                <input
+                  type="file"
+                  onChange={(e) =>
+                    updateSide(i, {
+                      before: URL.createObjectURL(e.target.files![0]),
+                    })
+                  }
+                />
+                <input
+                  type="file"
+                  onChange={(e) =>
+                    updateSide(i, {
+                      after: URL.createObjectURL(e.target.files![0]),
+                    })
+                  }
+                />
+              </div>
+
+              <div className="mt-3">
+                <BeforeAfter before={s.before} after={s.after} />
+              </div>
+
+              {/* openings */}
+              <div className="mt-4 space-y-2">
+                <button
+                  onClick={() => addOpening(i, "window")}
+                  className="text-sm bg-gray-200 px-3 py-1 rounded"
+                >
+                  + Window
+                </button>
+                <button
+                  onClick={() => addOpening(i, "door")}
+                  className="text-sm bg-gray-200 px-3 py-1 rounded ml-2"
+                >
+                  + Door
+                </button>
+
+                {s.openings.map((o, idx) => (
+                  <div key={o.id} className="grid grid-cols-4 gap-2 mt-2">
+                    <input
+                      placeholder="W"
+                      onChange={(e) =>
+                        (o.width = Number(e.target.value))
+                      }
+                      className="border p-2 rounded"
+                    />
+                    <input
+                      placeholder="H"
+                      onChange={(e) =>
+                        (o.height = Number(e.target.value))
+                      }
+                      className="border p-2 rounded"
+                    />
+                    <input
+                      placeholder="Qty"
+                      onChange={(e) =>
+                        (o.count = Number(e.target.value))
+                      }
+                      className="border p-2 rounded"
+                    />
+                    <div className="flex items-center text-sm">
+                      {o.type}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 text-sm text-gray-600">
+                Openings: {calcOpeningArea(s.openings).toFixed(2)} m²
+              </div>
+            </div>
+          ))}
+
+        </div>
+
+        {/* RIGHT */}
+        <div className="bg-white p-4 rounded-xl shadow h-fit sticky top-4">
+
+          <h2 className="font-bold text-lg mb-3">Summary</h2>
+
+          <div className="space-y-2 text-sm">
+            <div>Gross: {totals.gross.toFixed(2)} m²</div>
+            <div>Openings: {totals.open.toFixed(2)} m²</div>
+            <div className="font-bold">Net: {net.toFixed(2)} m²</div>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
   );
 }
