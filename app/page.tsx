@@ -2,244 +2,244 @@
 
 import { useState } from "react";
 
-type Opening = {
+type OpeningGroup = {
   id: string;
-  type: "window" | "door";
+  name: string;
   width: number;
   height: number;
   count: number;
 };
 
 type Side = {
+  id: string;
   name: string;
-  width: number;
-  height: number;
-  before?: string;
-  after?: string;
-  openings: Opening[];
-  orientation: "vertical" | "horizontal";
+  before: string | null;
+  after: string | null;
+  slider: number;
+  openings: OpeningGroup[];
 };
 
-const presets = {
-  windows: [
-    { label: "Custom", w: 0, h: 0 },
-    { label: "100 x 100", w: 100, h: 100 },
-    { label: "120 x 100", w: 120, h: 100 },
-    { label: "140 x 120", w: 140, h: 120 },
-  ],
-  doors: [
-    { label: "Custom", w: 0, h: 0 },
-    { label: "88 x 211", w: 88, h: 211 },
-    { label: "93 x 231", w: 93, h: 231 },
-  ],
-};
+const defaultSizes = [
+  { label: "Custom", w: 0, h: 0 },
+  { label: "Window 120x120", w: 120, h: 120 },
+  { label: "Window 100x100", w: 100, h: 100 },
+  { label: "Door 93x211", w: 93, h: 211 },
+  { label: "Door 83x201", w: 83, h: 201 },
+];
 
-function calcOpeningArea(openings: Opening[]) {
-  return openings.reduce(
-    (sum, o) => sum + (o.width / 100) * (o.height / 100) * o.count,
-    0
-  );
-}
-
-function BeforeAfter({ before, after }: { before?: string; after?: string }) {
-  const [pos, setPos] = useState(50);
-
-  if (!before || !after) return null;
-
-  return (
-    <div className="relative w-full h-64 rounded-xl overflow-hidden border">
-      <img src={before} className="absolute w-full h-full object-cover" />
-      <div
-        className="absolute top-0 left-0 h-full overflow-hidden"
-        style={{ width: `${pos}%` }}
-      >
-        <img src={after} className="w-full h-full object-cover" />
-      </div>
-      <input
-        type="range"
-        min={0}
-        max={100}
-        value={pos}
-        onChange={(e) => setPos(Number(e.target.value))}
-        className="absolute bottom-2 w-full"
-      />
-    </div>
-  );
+function createSide(name: string): Side {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    before: null,
+    after: null,
+    slider: 50,
+    openings: [],
+  };
 }
 
 export default function Page() {
   const [sides, setSides] = useState<Side[]>([
-    { name: "Front", width: 0, height: 0, openings: [], orientation: "vertical" },
-    { name: "Back", width: 0, height: 0, openings: [], orientation: "vertical" },
-    { name: "Left", width: 0, height: 0, openings: [], orientation: "vertical" },
-    { name: "Right", width: 0, height: 0, openings: [], orientation: "vertical" },
+    createSide("Voorzijde"),
+    createSide("Achterzijde"),
   ]);
 
-  const updateSide = (i: number, data: Partial<Side>) => {
+  const updateSide = (index: number, data: Partial<Side>) => {
     const copy = [...sides];
-    copy[i] = { ...copy[i], ...data };
+    copy[index] = { ...copy[index], ...data };
     setSides(copy);
   };
 
-  const addOpening = (i: number, type: "window" | "door") => {
-    const copy = [...sides];
-    copy[i].openings.push({
+  const addOpening = (i: number) => {
+    const side = sides[i];
+    side.openings.push({
       id: crypto.randomUUID(),
-      type,
-      width: 0,
-      height: 0,
+      name: "Window",
+      width: 120,
+      height: 120,
       count: 1,
     });
-    setSides(copy);
+    updateSide(i, { openings: [...side.openings] });
   };
 
-  const totals = sides.reduce(
-    (acc, s) => {
-      const gross = (s.width / 100) * (s.height / 100);
-      const open = calcOpeningArea(s.openings);
-      return {
-        gross: acc.gross + gross,
-        open: acc.open + open,
-      };
-    },
-    { gross: 0, open: 0 }
-  );
+  const updateOpening = (i: number, id: string, data: Partial<OpeningGroup>) => {
+    const side = sides[i];
+    side.openings = side.openings.map((o) =>
+      o.id === id ? { ...o, ...data } : o
+    );
+    updateSide(i, { openings: [...side.openings] });
+  };
 
-  const net = totals.gross - totals.open;
+  const totalM2 = (side: Side) => {
+    return side.openings.reduce(
+      (sum, o) => sum + (o.width / 100) * (o.height / 100) * o.count,
+      0
+    );
+  };
 
   return (
-    <main className="bg-gray-100 min-h-screen p-4">
-      <div className="max-w-7xl mx-auto grid lg:grid-cols-3 gap-6">
+    <main className="min-h-screen bg-[#f6f4ef] text-black p-4">
+      <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* LEFT */}
-        <div className="lg:col-span-2 space-y-6">
+        <h1 className="text-3xl font-bold">Gevel Visualizer</h1>
 
-          {sides.map((s, i) => (
-            <div key={i} className="bg-white p-4 rounded-xl shadow">
+        {sides.map((side, i) => (
+          <div key={side.id} className="rounded-2xl border p-5 bg-white shadow">
 
-              <h2 className="font-bold text-lg mb-2">{s.name}</h2>
+            <h2 className="text-xl font-semibold mb-4">{side.name}</h2>
 
-              <div className="grid md:grid-cols-2 gap-3">
-                <input
-                  placeholder="Width (cm)"
-                  className="border p-2 rounded"
-                  onChange={(e) =>
-                    updateSide(i, { width: Number(e.target.value) })
-                  }
-                />
-                <input
-                  placeholder="Height (cm)"
-                  className="border p-2 rounded"
-                  onChange={(e) =>
-                    updateSide(i, { height: Number(e.target.value) })
-                  }
-                />
-              </div>
+            {/* Upload */}
+            <div
+              className="border-2 border-dashed p-6 text-center rounded-xl"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const file = e.dataTransfer.files[0];
+                if (!file) return;
+                const url = URL.createObjectURL(file);
+                updateSide(i, { before: url, after: url });
+              }}
+            >
+              <p className="mb-3 font-semibold">
+                Sleep foto hier of kies bestand
+              </p>
 
-              {/* orientation */}
-              <div className="mt-3">
-                <select
-                  className="border p-2 rounded w-full"
-                  value={s.orientation}
-                  onChange={(e) =>
-                    updateSide(i, { orientation: e.target.value as any })
-                  }
-                >
-                  <option value="vertical">Vertical</option>
-                  <option value="horizontal">Horizontal</option>
-                </select>
-              </div>
+              <div className="flex gap-3 justify-center">
+                <label className="border px-4 py-2 rounded-xl cursor-pointer">
+                  📷 Foto
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    hidden
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      const url = URL.createObjectURL(f);
+                      updateSide(i, { before: url, after: url });
+                    }}
+                  />
+                </label>
 
-              {/* uploads */}
-              <div className="grid md:grid-cols-2 gap-3 mt-3">
-                <input
-                  type="file"
-                  onChange={(e) =>
-                    updateSide(i, {
-                      before: URL.createObjectURL(e.target.files![0]),
-                    })
-                  }
-                />
-                <input
-                  type="file"
-                  onChange={(e) =>
-                    updateSide(i, {
-                      after: URL.createObjectURL(e.target.files![0]),
-                    })
-                  }
-                />
-              </div>
-
-              <div className="mt-3">
-                <BeforeAfter before={s.before} after={s.after} />
-              </div>
-
-              {/* openings */}
-              <div className="mt-4 space-y-2">
-                <button
-                  onClick={() => addOpening(i, "window")}
-                  className="text-sm bg-gray-200 px-3 py-1 rounded"
-                >
-                  + Window
-                </button>
-                <button
-                  onClick={() => addOpening(i, "door")}
-                  className="text-sm bg-gray-200 px-3 py-1 rounded ml-2"
-                >
-                  + Door
-                </button>
-
-                {s.openings.map((o, idx) => (
-                  <div key={o.id} className="grid grid-cols-4 gap-2 mt-2">
-                    <input
-                      placeholder="W"
-                      onChange={(e) =>
-                        (o.width = Number(e.target.value))
-                      }
-                      className="border p-2 rounded"
-                    />
-                    <input
-                      placeholder="H"
-                      onChange={(e) =>
-                        (o.height = Number(e.target.value))
-                      }
-                      className="border p-2 rounded"
-                    />
-                    <input
-                      placeholder="Qty"
-                      onChange={(e) =>
-                        (o.count = Number(e.target.value))
-                      }
-                      className="border p-2 rounded"
-                    />
-                    <div className="flex items-center text-sm">
-                      {o.type}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-3 text-sm text-gray-600">
-                Openings: {calcOpeningArea(s.openings).toFixed(2)} m²
+                <label className="border px-4 py-2 rounded-xl cursor-pointer">
+                  📁 Bestand
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      const url = URL.createObjectURL(f);
+                      updateSide(i, { before: url, after: url });
+                    }}
+                  />
+                </label>
               </div>
             </div>
-          ))}
 
-        </div>
+            {/* Before After */}
+            {side.before && side.after && (
+              <div className="mt-5">
+                <div className="relative w-full h-64 overflow-hidden rounded-xl">
+                  <img
+                    src={side.before}
+                    className="absolute w-full h-full object-cover"
+                  />
+                  <img
+                    src={side.after}
+                    className="absolute top-0 left-0 h-full object-cover"
+                    style={{ width: `${side.slider}%` }}
+                  />
+                </div>
 
-        {/* RIGHT */}
-        <div className="bg-white p-4 rounded-xl shadow h-fit sticky top-4">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={side.slider}
+                  onChange={(e) =>
+                    updateSide(i, { slider: Number(e.target.value) })
+                  }
+                  className="w-full mt-2"
+                />
+              </div>
+            )}
 
-          <h2 className="font-bold text-lg mb-3">Summary</h2>
+            {/* Openings */}
+            <div className="mt-6 space-y-3">
+              <h3 className="font-semibold">Openingen</h3>
 
-          <div className="space-y-2 text-sm">
-            <div>Gross: {totals.gross.toFixed(2)} m²</div>
-            <div>Openings: {totals.open.toFixed(2)} m²</div>
-            <div className="font-bold">Net: {net.toFixed(2)} m²</div>
+              {side.openings.map((o) => (
+                <div key={o.id} className="border p-3 rounded-xl space-y-2">
+
+                  <select
+                    className="w-full border p-2 rounded"
+                    onChange={(e) => {
+                      const preset = defaultSizes.find(
+                        (s) => s.label === e.target.value
+                      );
+                      if (!preset) return;
+                      updateOpening(i, o.id, {
+                        width: preset.w,
+                        height: preset.h,
+                      });
+                    }}
+                  >
+                    {defaultSizes.map((s) => (
+                      <option key={s.label}>{s.label}</option>
+                    ))}
+                  </select>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      placeholder="Breedte"
+                      className="border p-2 rounded"
+                      value={o.width}
+                      onChange={(e) =>
+                        updateOpening(i, o.id, {
+                          width: Number(e.target.value),
+                        })
+                      }
+                    />
+                    <input
+                      placeholder="Hoogte"
+                      className="border p-2 rounded"
+                      value={o.height}
+                      onChange={(e) =>
+                        updateOpening(i, o.id, {
+                          height: Number(e.target.value),
+                        })
+                      }
+                    />
+                    <input
+                      placeholder="Aantal"
+                      className="border p-2 rounded"
+                      value={o.count}
+                      onChange={(e) =>
+                        updateOpening(i, o.id, {
+                          count: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <button
+                onClick={() => addOpening(i)}
+                className="bg-black text-white px-4 py-2 rounded-xl"
+              >
+                + Opening toevoegen
+              </button>
+            </div>
+
+            {/* Result */}
+            <div className="mt-4 text-lg font-semibold">
+              Opening totaal: {totalM2(side).toFixed(2)} m²
+            </div>
           </div>
-
-        </div>
-
+        ))}
       </div>
     </main>
   );
